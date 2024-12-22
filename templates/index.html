@@ -56,19 +56,9 @@
     <!-- Modal des notes -->
     <div id="notes-modal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h2>Notes</h2>
-                <button class="close-button" onclick="closeNotesModal()">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="notes-actions">
-                    <button id="save-notes" onclick="saveNotes()" class="action-button">
-                        <i class="fas fa-bookmark"></i>
-                        Sauvegarder
-                    </button>
-                </div>
-                <div id="notes-display" class="notes-display"></div>
-            </div>
+            <span class="close" onclick="closeNotesModal()">&times;</span>
+            <h2>Mes Notes</h2>
+            <div id="notes-display"></div>
         </div>
     </div>
 

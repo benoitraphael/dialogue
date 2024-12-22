@@ -255,110 +255,124 @@ def get_conversation(conversation_id):
         print(f"Erreur lors de la récupération de la conversation: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/check_note', methods=['POST'])
+def check_note():
+    data = request.json
+    text = data.get('text')
+    
+    if not text:
+        return jsonify({'error': 'Texte manquant'}), 400
+    
+    # Lire le fichier des notes
+    try:
+        with open('data/notes.md', 'r', encoding='utf-8') as f:
+            notes_content = f.read()
+            # Vérifier si le texte existe dans les notes
+            is_saved = text in notes_content
+            return jsonify({'saved': is_saved})
+    except FileNotFoundError:
+        return jsonify({'saved': False})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/save_note', methods=['POST'])
 def save_note():
     try:
         data = request.get_json()
-        if not data or 'content' not in data or 'role' not in data:
-            return jsonify({"error": "Données manquantes"}), 400
-
-        content = data['content']
-        role = data['role']
+        if not data or 'text' not in data:
+            return jsonify({"error": "Le texte est requis"}), 400
+            
+        text = data['text']
+        role = data.get('role', 'user')  # Par défaut 'user' si non spécifié
         
-        # Créer le fichier notes.md s'il n'existe pas
-        notes_file = os.path.join('data', 'notes.md')
+        # Créer le dossier data s'il n'existe pas
+        if not os.path.exists('data'):
+            os.makedirs('data')
+            
+        # Générer le timestamp
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         
-        # Formater la note avec la date et l'auteur
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        author = "Claude" if role == "assistant" else "Vous"
-        note_entry = f"\n\n## {timestamp} - {author}\n\n{content}\n\n---"
+        # Créer l'entrée de la note avec le rôle
+        note_entry = f"\n\n## Note de {role} - {timestamp}\n\n{text}"
         
         # Ajouter la note au fichier
+        notes_file = os.path.join('data', 'notes.md')
         with open(notes_file, 'a', encoding='utf-8') as f:
             f.write(note_entry)
+            
+        return jsonify({"message": "Note sauvegardée", "timestamp": timestamp})
         
-        return jsonify({"message": "Note sauvegardée avec succès"})
     except Exception as e:
+        print("Erreur lors de la sauvegarde de la note:", str(e))
         return jsonify({"error": str(e)}), 500
 
 @app.route('/delete_note', methods=['POST'])
 def delete_note():
     try:
         data = request.get_json()
-        if not data or 'timestamp' not in data:
-            return jsonify({"error": "Timestamp manquant"}), 400
-
-        timestamp = data['timestamp']
-        notes_file = os.path.join('data', 'notes.md')
+        print("Requête de suppression reçue avec données:", data)
         
-        if not os.path.exists(notes_file):
-            return jsonify({"error": "Fichier de notes non trouvé"}), 404
-
-        with open(notes_file, 'r', encoding='utf-8') as f:
-            content = f.read()
-
-        # Diviser le contenu en notes individuelles
-        notes = content.split('\n\n## ')
-        if notes[0] == '':  # Supprimer le premier élément s'il est vide
-            notes = notes[1:]
+        if not data or 'timestamp' not in data:
+            print("Erreur: timestamp manquant dans la requête")
+            return jsonify({'error': 'Timestamp manquant'}), 400
+            
+        timestamp = data['timestamp']
+        print("Tentative de suppression pour timestamp:", timestamp)
+        
+        # Charger les notes existantes
+        if os.path.exists('data/notes.md'):
+            with open('data/notes.md', 'r', encoding='utf-8') as f:
+                content = f.read()
+                print("Contenu actuel du fichier:", content)
         else:
-            notes[0] = notes[0].lstrip('\n')  # Nettoyer le début du premier élément
-            if notes[0].startswith('## '):
-                notes[0] = notes[0][3:]  # Supprimer le '## ' initial si présent
+            print("Fichier notes.md non trouvé")
+            return jsonify({'error': 'Aucune note trouvée'}), 404
 
-        # Filtrer les notes pour exclure celle avec le timestamp correspondant
-        updated_notes = [note for note in notes if not note.startswith(timestamp)]
+        # Séparer les notes
+        notes = content.split('\n\n## ')
+        print(f"Nombre de notes trouvées: {len(notes)}")
+        
+        # Filtrer les notes pour garder celles qui ne correspondent pas au timestamp
+        new_notes = [note for note in notes if timestamp not in note]
+        print(f"Nombre de notes après filtrage: {len(new_notes)}")
+        
+        if len(new_notes) == len(notes):
+            print("Note non trouvée pour le timestamp:", timestamp)
+            return jsonify({'error': 'Note non trouvée'}), 404
 
-        # Réécrire le fichier avec les notes restantes
-        with open(notes_file, 'w', encoding='utf-8') as f:
-            for i, note in enumerate(updated_notes):
-                if i == 0:
-                    f.write(f"## {note}")
-                else:
-                    f.write(f"\n\n## {note}")
+        # Sauvegarder les notes restantes
+        with open('data/notes.md', 'w', encoding='utf-8') as f:
+            f.write('\n\n'.join(new_notes))
+        print("Notes mises à jour avec succès")
 
-        return jsonify({"message": "Note supprimée avec succès"})
+        return jsonify({'success': True})
+        
     except Exception as e:
-        print(f"Erreur lors de la suppression de la note: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        print("Erreur lors de la suppression:", str(e))
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/get_notes')
 def get_notes():
     try:
+        print("Tentative de lecture des notes...")
         notes_file = os.path.join('data', 'notes.md')
+        
         if not os.path.exists(notes_file):
+            print("Fichier notes.md non trouvé")
             return jsonify({"content": "Aucune note pour le moment"})
             
         with open(notes_file, 'r', encoding='utf-8') as f:
-            notes = f.read()
-        
-        # Diviser les notes en sections individuelles
-        note_sections = notes.split('\n\n## ')
-        formatted_notes = []
-        
-        for note in note_sections:
-            if note.strip():
-                # Nettoyer le début de la note
-                if note.startswith('## '):
-                    note = note[3:]
+            content = f.read()
+            print("Contenu lu:", content)
+            
+            if not content.strip():
+                print("Fichier vide")
+                return jsonify({"content": "Aucune note pour le moment"})
                 
-                # Séparer le titre (timestamp + auteur) du contenu
-                lines = note.split('\n', 1)
-                if len(lines) == 2:
-                    timestamp_author = lines[0]
-                    content = lines[1].strip()
-                    formatted_notes.append(
-                        f'<div class="note-item">'
-                        f'<div class="note-header">{timestamp_author}</div>'
-                        f'<div class="note-content">{content}</div>'
-                        f'<button class="delete-note" title="Supprimer cette note">'
-                        f'<i class="fas fa-trash"></i>'
-                        f'</button>'
-                        f'</div>'
-                    )
-        
-        return jsonify({"content": '\n'.join(formatted_notes)})
+            return jsonify({"content": content})
+            
     except Exception as e:
+        print("Erreur lors de la lecture des notes:", str(e))
         return jsonify({"error": str(e)}), 500
 
 @app.route('/delete_conversation', methods=['POST'])

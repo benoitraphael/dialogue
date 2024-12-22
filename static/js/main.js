@@ -1,44 +1,217 @@
 let currentConversationId = null;
 let editingMessage = null;
 
+// Regrouper toute l'initialisation dans un seul DOMContentLoaded
 document.addEventListener('DOMContentLoaded', function() {
     const textarea = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
     
-    // Charger les conversations au démarrage
-    loadConversations();
-
-    // Fonction pour ajuster automatiquement la hauteur du textarea
-    function autoResizeTextarea(textarea) {
-        textarea.style.height = 'auto';
-        textarea.style.height = (textarea.scrollHeight) + 'px';
-    }
-
-    // Initialisation
+    // Auto-resize du textarea
     autoResizeTextarea(textarea);
-
-    // Événement pour l'auto-resize du textarea
-    textarea.addEventListener('input', function() {
-        autoResizeTextarea(this);
-        // Activer/désactiver le bouton d'envoi
-        sendButton.disabled = !this.value.trim();
-    });
-
-    // Événement pour la touche Entrée (sans Shift)
-    textarea.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            if (!this.value.trim()) return;
-            sendMessage();
+    textarea.addEventListener('input', () => autoResizeTextarea(textarea));
+    
+    // Gestion de l'envoi des messages
+    textarea.addEventListener('keydown', handleKeyPress);
+    sendButton.addEventListener('click', handleSendClick);
+    
+    // Charger les conversations existantes
+    loadConversations();
+    
+    // Délégation d'événement pour les boutons de suppression dans la modal
+    document.getElementById('notes-modal').addEventListener('click', async (e) => {
+        const deleteButton = e.target.closest('.delete-note');
+        if (!deleteButton) return;
+        
+        console.log('Clic sur bouton supprimer détecté');
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const timestamp = deleteButton.getAttribute('data-timestamp');
+        if (!timestamp) {
+            console.error('Pas de timestamp trouvé sur le bouton');
+            return;
+        }
+        
+        if (await handleDeleteNote(timestamp)) {
+            showNotification('Note supprimée !');
         }
     });
-
-    // Événement pour le bouton d'envoi
-    sendButton.addEventListener('click', function() {
-        if (!textarea.value.trim()) return;
-        sendMessage();
-    });
 });
+
+async function handleDeleteNote(timestamp) {
+    if (!confirm('Voulez-vous vraiment supprimer cette note ?')) {
+        return false;
+    }
+
+    try {
+        const response = await fetch('/delete_note', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ timestamp })
+        });
+
+        if (!response.ok) {
+            throw new Error('Erreur lors de la suppression');
+        }
+
+        // 1. Supprimer la note de l'affichage modal
+        const noteItem = document.querySelector(`.delete-note[data-timestamp="${timestamp}"]`).closest('.note-item');
+        if (noteItem) {
+            noteItem.remove();
+        }
+
+        // 2. Mettre à jour l'icône dans la conversation
+        const messages = document.querySelectorAll('.message');
+        let found = false;
+        messages.forEach(message => {
+            const messageTimestamp = message.getAttribute('data-timestamp');
+            console.log('Comparaison timestamps:', { message: messageTimestamp, delete: timestamp });
+            if (messageTimestamp === timestamp) {
+                found = true;
+                const saveButton = message.querySelector('.save-note-button');
+                if (saveButton) {
+                    saveButton.classList.remove('saved');
+                    saveButton.querySelector('i').classList.remove('fas');
+                    saveButton.querySelector('i').classList.add('far');
+                    console.log('Icône mise à jour pour le message:', messageTimestamp);
+                }
+            }
+        });
+
+        if (!found) {
+            console.warn('Aucun message trouvé avec le timestamp:', timestamp);
+        }
+
+        // Vérifier s'il reste des notes
+        const notesDisplay = document.getElementById('notes-display');
+        if (!notesDisplay.querySelector('.note-item')) {
+            notesDisplay.innerHTML = "<p>Aucune note pour le moment</p>";
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        showNotification('Erreur lors de la suppression', true);
+        return false;
+    }
+}
+
+async function addMessage(text, className) {
+    const messages = document.getElementById('messages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${className}`;
+    
+    const messageContent = document.createElement('div');
+    messageContent.className = 'message-content';
+    
+    const messageText = document.createElement('div');
+    messageText.className = 'message-text';
+    
+    // Appliquer la coloration syntaxique si nécessaire
+    if (className === 'assistant-message') {
+        messageText.innerHTML = marked.parse(text);
+        // Appliquer highlight.js aux blocs de code
+        messageText.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightBlock(block);
+        });
+    } else {
+        messageText.textContent = text;
+    }
+    
+    const saveButton = document.createElement('button');
+    saveButton.className = 'save-note-button';
+    saveButton.innerHTML = '<i class="far fa-bookmark"></i>';
+    saveButton.title = 'Sauvegarder comme note';
+    
+    // Ajouter l'événement de clic pour la sauvegarde
+    saveButton.onclick = async (e) => {
+        e.preventDefault();
+        console.log('Clic sur sauvegarder pour le message:', text);
+        try {
+            const role = className === 'user-message' ? 'user' : 'assistant';
+            await saveNote(text, messageDiv, role);
+        } catch (error) {
+            console.error('Erreur lors de la sauvegarde:', error);
+        }
+    };
+    
+    messageContent.appendChild(messageText);
+    messageContent.appendChild(saveButton);
+    messageDiv.appendChild(messageContent);
+    
+    messages.appendChild(messageDiv);
+    messages.scrollTop = messages.scrollHeight;
+    
+    return messageDiv;
+}
+
+async function saveNote(text, messageDiv, role) {
+    if (!messageDiv || !messageDiv.querySelector) {
+        console.error('messageDiv invalide:', messageDiv);
+        return false;
+    }
+
+    try {
+        console.log('Tentative de sauvegarde de la note:', { text, role });
+        const response = await fetch('/save_note', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ text, role })
+        });
+
+        if (!response.ok) {
+            throw new Error('Erreur lors de la sauvegarde');
+        }
+
+        const data = await response.json();
+        console.log('Réponse de sauvegarde:', data);
+
+        if (!data.timestamp) {
+            throw new Error('Pas de timestamp dans la réponse');
+        }
+
+        // Mettre à jour l'icône et le timestamp
+        const saveButton = messageDiv.querySelector('.save-note-button');
+        if (saveButton) {
+            saveButton.classList.add('saved');
+            saveButton.querySelector('i').classList.remove('far');
+            saveButton.querySelector('i').classList.add('fas');
+        }
+        
+        // Stocker le timestamp sur le message pour la suppression future
+        messageDiv.setAttribute('data-timestamp', data.timestamp);
+        console.log('Message mis à jour avec timestamp:', data.timestamp);
+
+        showNotification('Note sauvegardée !');
+        return true;
+    } catch (error) {
+        console.error('Erreur lors de la sauvegarde:', error);
+        showNotification('Erreur lors de la sauvegarde', true);
+        return false;
+    }
+}
+
+function autoResizeTextarea(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = (textarea.scrollHeight) + 'px';
+}
+
+function handleKeyPress(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (!e.target.value.trim()) return;
+        sendMessage();
+    }
+}
+
+function handleSendClick() {
+    if (!document.getElementById('message-input').value.trim()) return;
+    sendMessage();
+}
 
 async function sendMessage() {
     const userInput = document.getElementById('message-input');
@@ -250,42 +423,6 @@ function startNewConversation() {
         item.classList.remove('selected');
     });
     showNotification('Nouvelle conversation démarrée');
-}
-
-function addMessage(text, className) {
-    const messages = document.getElementById('messages');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${className}`;
-    
-    // Créer le conteneur de texte
-    const textDiv = document.createElement('div');
-    textDiv.className = 'message-text';
-    
-    // Convertir le Markdown en HTML et nettoyer
-    const htmlContent = DOMPurify.sanitize(marked.parse(text));
-    textDiv.innerHTML = htmlContent;
-    
-    // Ajouter le bouton d'édition pour les messages utilisateur
-    if (className === 'user-message') {
-        const editButton = document.createElement('button');
-        editButton.className = 'edit-button';
-        editButton.innerHTML = '<i class="fas fa-edit"></i>';
-        editButton.onclick = () => editMessage(messageDiv);
-        messageDiv.appendChild(editButton);
-    }
-    
-    messageDiv.appendChild(textDiv);
-    messages.appendChild(messageDiv);
-    
-    // Appliquer la coloration syntaxique
-    messageDiv.querySelectorAll('pre code').forEach((block) => {
-        hljs.highlightElement(block);
-    });
-    
-    // Faire défiler jusqu'au nouveau message
-    messageDiv.scrollIntoView({ behavior: 'smooth' });
-    
-    return messageDiv;
 }
 
 function editMessage(messageDiv) {
@@ -502,54 +639,149 @@ function scrollToBottom() {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-function deleteNote(timestamp, noteElement) {
-    fetch('/delete_note', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ timestamp })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            throw new Error(data.error);
-        }
-        noteElement.remove();
-        showNotification('Note supprimée !');
+async function loadNotes() {
+    try {
+        console.log('Chargement des notes...');
+        const response = await fetch('/get_notes');
+        const data = await response.json();
+        console.log('Notes reçues:', data);
         
-        // Si c'était la dernière note, afficher le message
-        const notesContent = document.querySelector('.notes-content');
-        if (!notesContent.querySelector('.note-item')) {
-            notesContent.innerHTML = "<p>Aucune note pour le moment</p>";
+        const notesDisplay = document.getElementById('notes-display');
+        
+        if (!data.content || data.content === "Aucune note pour le moment") {
+            notesDisplay.innerHTML = "<p>Aucune note pour le moment</p>";
+            return;
         }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('Erreur lors de la suppression', true);
-    });
+
+        // Convertir le contenu Markdown en HTML
+        const rawHtml = marked.parse(data.content);
+        console.log('HTML brut:', rawHtml);
+        
+        // Créer un conteneur temporaire pour parser le HTML
+        const temp = document.createElement('div');
+        temp.innerHTML = DOMPurify.sanitize(rawHtml);
+        
+        // Extraire les notes
+        const notes = [];
+        const titles = temp.querySelectorAll('h2');
+        console.log('Titres trouvés:', titles.length);
+        
+        titles.forEach(title => {
+            const titleText = title.textContent;
+            console.log('Traitement du titre:', titleText);
+            
+            if (!titleText.includes(' - ')) return;
+            
+            const [notePrefix, timestamp] = titleText.split(' - ');
+            let content = '';
+            let next = title.nextElementSibling;
+            
+            while (next && next.tagName !== 'H2') {
+                content += next.outerHTML;
+                next = next.nextElementSibling;
+            }
+            
+            notes.push({
+                timestamp,
+                title: notePrefix,
+                content
+            });
+        });
+        
+        console.log('Notes extraites:', notes);
+        
+        // Générer le HTML des notes
+        const notesHtml = notes.map(note => `
+            <div class="note-item">
+                <button class="delete-note" data-timestamp="${note.timestamp}">
+                    <i class="fas fa-trash"></i>
+                </button>
+                <h2>${note.title} - ${note.timestamp}</h2>
+                <div class="note-content">
+                    ${note.content}
+                </div>
+            </div>
+        `).join('');
+        
+        notesDisplay.innerHTML = notesHtml || "<p>Aucune note pour le moment</p>";
+        console.log('Affichage des notes terminé');
+        
+    } catch (error) {
+        console.error('Erreur lors du chargement des notes:', error);
+        displayErrorMessage("Erreur lors du chargement des notes");
+    }
 }
 
-function saveNote(content, role) {
-    return fetch('/save_note', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ content, role })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            throw new Error(data.error);
+async function openNotesModal() {
+    console.log('Ouverture de la modal des notes');
+    const modal = document.getElementById('notes-modal');
+    modal.style.display = 'block';
+    await loadNotes();
+}
+
+function closeNotesModal() {
+    console.log('Fermeture de la modal des notes');
+    const modal = document.getElementById('notes-modal');
+    modal.style.display = 'none';
+}
+
+// Gestionnaire pour fermer la modal quand on clique en dehors
+window.addEventListener('click', (event) => {
+    const modal = document.getElementById('notes-modal');
+    if (event.target === modal) {
+        closeNotesModal();
+    }
+});
+
+async function deleteNote(timestamp, noteElement) {
+    console.log('Début de la suppression pour:', timestamp);
+    try {
+        const response = await fetch('/delete_note', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ timestamp })
+        });
+
+        console.log('Réponse reçue:', response.status);
+        const data = await response.json();
+        console.log('Données de suppression:', data);
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Erreur lors de la suppression');
         }
-        showNotification('Note sauvegardée !');
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showNotification('Erreur lors de la sauvegarde', true);
-        throw error; // Propager l'erreur pour que le bouton ne change pas de style
-    });
+
+        // Supprimer la note de l'affichage
+        console.log('Suppression de la note de l\'affichage');
+        noteElement.remove();
+        showNotification('Note supprimée !');
+
+        // Mettre à jour l'icône du message original
+        const messages = document.querySelectorAll('.message');
+        messages.forEach(message => {
+            const messageTimestamp = message.getAttribute('data-timestamp');
+            if (messageTimestamp === timestamp) {
+                const saveButton = message.querySelector('.save-note-button');
+                if (saveButton) {
+                    console.log('Mise à jour de l\'icône du message');
+                    saveButton.classList.remove('saved');
+                    saveButton.querySelector('i').classList.remove('fas');
+                    saveButton.querySelector('i').classList.add('far');
+                }
+            }
+        });
+
+        // Vérifier s'il reste des notes
+        const notesDisplay = document.getElementById('notes-display');
+        if (!notesDisplay.querySelector('.note-item')) {
+            console.log('Plus de notes, affichage du message vide');
+            notesDisplay.innerHTML = "<p>Aucune note pour le moment</p>";
+        }
+    } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        showNotification('Erreur lors de la suppression', true);
+    }
 }
 
 function showNotification(message, isError = false) {
@@ -563,155 +795,24 @@ function showNotification(message, isError = false) {
     }, 3000);
 }
 
-async function loadNotes() {
+async function checkIfNoteSaved(text) {
     try {
-        const response = await fetch('/get_notes');
-        if (!response.ok) {
-            throw new Error('Erreur lors du chargement des notes');
-        }
-        
-        const data = await response.json();
-        const notesDisplay = document.querySelector('.notes-display');
-        
-        // Si le contenu est vide, initialiser avec un message
-        if (!data.content) {
-            notesDisplay.innerHTML = '<div class="note-item"><div class="note-content">Commencez à prendre des notes...</div></div>';
-            return;
-        }
-        
-        // Si le contenu est déjà formaté en HTML
-        if (data.content.includes('note-item')) {
-            notesDisplay.innerHTML = data.content;
-        } else {
-            // Formatter le texte en notes
-            const notes = data.content.split('\n\n').filter(note => note.trim());
-            const formattedNotes = notes.map(note => {
-                const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
-                return `<div class="note-item">
-                    <div class="note-header">${timestamp} - Vous</div>
-                    <div class="note-content">${note.trim()}</div>
-                    <button class="delete-note" title="Supprimer cette note">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>`;
-            }).join('\n');
-            notesDisplay.innerHTML = formattedNotes;
-        }
-        
-        // Ajouter les gestionnaires d'événements pour les boutons de suppression
-        notesDisplay.querySelectorAll('.delete-note').forEach(button => {
-            button.onclick = (e) => {
-                e.preventDefault();
-                if (confirm('Voulez-vous vraiment supprimer cette note ?')) {
-                    const noteItem = button.closest('.note-item');
-                    noteItem.remove();
-                    saveCurrentDisplay();
-                }
-            };
-        });
-        
-    } catch (error) {
-        console.error('Erreur:', error);
-        displayErrorMessage("Erreur lors du chargement des notes");
-    }
-}
-
-async function saveNotes() {
-    const notesDisplay = document.querySelector('.notes-display');
-    const saveButton = document.getElementById('save-notes');
-    
-    try {
-        // Sauvegarder le contenu HTML actuel
-        const response = await fetch('/save_notes', {
+        const response = await fetch('/check_note', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ content: notesDisplay.innerHTML })
+            body: JSON.stringify({ text })
         });
         
         if (!response.ok) {
-            throw new Error('Erreur lors de la sauvegarde des notes');
+            throw new Error('Erreur lors de la vérification');
         }
         
-        // Ajouter la classe 'saved' au bouton
-        saveButton.classList.add('saved');
-        
-        // Retirer la classe après 2 secondes
-        setTimeout(() => {
-            saveButton.classList.remove('saved');
-        }, 2000);
-        
+        const data = await response.json();
+        return data.saved;
     } catch (error) {
-        console.error('Erreur:', error);
-        displayErrorMessage("Erreur lors de la sauvegarde des notes");
+        console.error('Erreur lors de la vérification:', error);
+        return false;
     }
-}
-
-function saveCurrentDisplay() {
-    const notesDisplay = document.querySelector('.notes-display');
-    
-    fetch('/save_notes', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ content: notesDisplay.innerHTML })
-    })
-    .catch(error => {
-        console.error('Erreur lors de la sauvegarde:', error);
-        displayErrorMessage("Erreur lors de la sauvegarde des notes");
-    });
-}
-
-function openNotesModal() {
-    const modal = document.getElementById('notes-modal');
-    modal.classList.add('show');
-    loadNotes();
-}
-
-function closeNotesModal() {
-    const modal = document.getElementById('notes-modal');
-    modal.classList.remove('show');
-}
-
-function appendMessage(message, role) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${role}-message`;
-    
-    // Créer le conteneur pour le texte et les actions
-    const contentContainer = document.createElement('div');
-    contentContainer.className = 'message-content';
-    
-    // Ajouter le texte du message
-    const textDiv = document.createElement('div');
-    textDiv.className = 'message-text';
-    textDiv.textContent = message;
-    contentContainer.appendChild(textDiv);
-    
-    // Si c'est un message de l'assistant, ajouter le bouton de sauvegarde
-    if (role === 'assistant') {
-        const bookmarkButton = document.createElement('button');
-        bookmarkButton.className = 'bookmark-button';
-        bookmarkButton.innerHTML = '<i class="far fa-bookmark"></i>';
-        bookmarkButton.title = 'Sauvegarder dans les notes';
-        
-        bookmarkButton.onclick = async () => {
-            try {
-                await saveNote(message, role);
-                bookmarkButton.innerHTML = '<i class="fas fa-bookmark"></i>';
-                bookmarkButton.classList.add('saved');
-                showNotification('Note sauvegardée !');
-            } catch (error) {
-                console.error('Erreur lors de la sauvegarde:', error);
-                showNotification('Erreur lors de la sauvegarde', true);
-            }
-        };
-        
-        contentContainer.appendChild(bookmarkButton);
-    }
-    
-    messageDiv.appendChild(contentContainer);
-    document.getElementById('messages').appendChild(messageDiv);
-    scrollToBottom();
 }
