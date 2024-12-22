@@ -4,6 +4,8 @@ import os
 import anthropic
 from models import db, Message, Conversation
 from datetime import datetime
+import json
+import uuid
 
 app = Flask(__name__)
 CORS(app)
@@ -18,6 +20,17 @@ db.init_app(app)
 # Créer les tables si elles n'existent pas
 with app.app_context():
     db.create_all()
+
+def get_notes_content():
+    try:
+        notes_file = os.path.join('data', 'notes.md')
+        if os.path.exists(notes_file):
+            with open(notes_file, 'r', encoding='utf-8') as f:
+                return f.read()
+        return ""
+    except Exception as e:
+        print(f"Erreur lors de la lecture des notes: {str(e)}")
+        return ""
 
 @app.route('/')
 def home():
@@ -35,116 +48,176 @@ def internal_error(error):
 @app.route('/chat', methods=['POST'])
 def chat():
     try:
-        if not request.is_json:
-            return jsonify({"error": "Content-Type doit être application/json"}), 400
-
+        print("\n=== Début de la requête chat ===")
         data = request.get_json()
-        if not data:
-            return jsonify({"error": "Données JSON manquantes"}), 400
-
-        message = data.get('message', '').strip()
+        print(f"Données reçues: {data}")
+        
+        if not data or 'message' not in data:
+            print("Erreur: message manquant dans les données")
+            return jsonify({"error": "Message manquant"}), 400
+            
         conversation_id = data.get('conversation_id')
+        user_message = data['message']
         is_edit = data.get('is_edit', False)
-
-        print(f"Received request - message: {message}, conversation_id: {conversation_id}, is_edit: {is_edit}")
-
-        if not message:
-            return jsonify({"error": "Le message ne peut pas être vide"}), 400
-
-        # Si pas de conversation_id, créer une nouvelle conversation
+        print(f"conversation_id: {conversation_id}, message: {user_message}, is_edit: {is_edit}")
+        
+        # Créer une nouvelle conversation si nécessaire
         if not conversation_id:
+            print("Création d'une nouvelle conversation")
             conversation = Conversation()
             db.session.add(conversation)
             db.session.commit()
             conversation_id = conversation.id
-            print(f"Created new conversation with id: {conversation_id}")
-        else:
-            conversation = Conversation.query.get(conversation_id)
-            if not conversation:
-                print(f"Conversation {conversation_id} not found")
-                return jsonify({"error": f"Conversation {conversation_id} non trouvée"}), 404
-
-        # Si c'est une édition, supprimer les messages précédents
+            print(f"Nouvelle conversation créée avec l'ID: {conversation_id}")
+            
+        # Si c'est une édition, supprimer les deux derniers messages
         if is_edit:
+            print("Mode édition : suppression des deux derniers messages")
             try:
-                messages = Message.query.filter_by(conversation_id=conversation_id).order_by(Message.timestamp.desc()).limit(2).all()
-                for msg in messages:
-                    print(f"Deleting message - role: {msg.role}, content: {msg.content}")
+                # Récupérer les deux derniers messages de la conversation
+                last_messages = Message.query.filter_by(conversation_id=conversation_id).order_by(Message.timestamp.desc()).limit(2).all()
+                
+                # Les supprimer de la base de données
+                for msg in last_messages:
                     db.session.delete(msg)
                 db.session.commit()
-                print("Successfully deleted previous messages")
+                print(f"Suppression de {len(last_messages)} messages")
             except Exception as e:
-                print(f"Error deleting messages: {str(e)}")
+                print(f"Erreur lors de la suppression des messages: {str(e)}")
                 db.session.rollback()
-                return jsonify({"error": "Erreur lors de la suppression des messages"}), 500
-
-        # Ajouter le nouveau message utilisateur
+                raise
+        
+        # Sauvegarder le message utilisateur
         try:
-            user_message = Message(
-                conversation_id=conversation_id,
-                role="user",
-                content=message
-            )
-            db.session.add(user_message)
+            print("Sauvegarde du message utilisateur")
+            user_msg = Message(content=user_message, role='user', conversation_id=conversation_id)
+            db.session.add(user_msg)
             db.session.commit()
-            print("Added user message")
+            print("Message utilisateur sauvegardé avec succès")
         except Exception as e:
-            print(f"Error adding user message: {str(e)}")
+            print(f"Erreur lors de la sauvegarde du message utilisateur: {str(e)}")
             db.session.rollback()
-            return jsonify({"error": "Erreur lors de l'ajout du message"}), 500
-
+            raise
+        
+        # Initialiser la liste des messages pour Claude
+        messages_for_claude = []
+        
+        # Si c'est une nouvelle conversation, commencer par les notes
+        if not data.get('conversation_id'):
+            print("Lecture des notes pour nouvelle conversation")
+            notes_content = get_notes_content()
+            if notes_content:
+                print("Notes trouvées, ajout au contexte")
+                messages_for_claude.append({
+                    "role": "user",
+                    "content": f"Voici mes notes précédentes, utilise-les pour personnaliser tes réponses :\n\n{notes_content}"
+                })
+        
+        # Récupérer tous les messages de la conversation
         try:
-            # Récupérer la conversation mise à jour
-            messages = Message.query.filter_by(conversation_id=conversation_id).order_by(Message.timestamp).all()
-            messages_for_claude = [{"role": msg.role, "content": msg.content} for msg in messages]
-            print(f"Sending {len(messages_for_claude)} messages to Claude")
-
-            # Appeler l'API Anthropic
-            client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+            print("Récupération des messages de la conversation")
+            messages = Message.query.filter_by(conversation_id=conversation_id).order_by(Message.timestamp.asc()).all()
+            print(f"Nombre de messages trouvés: {len(messages)}")
+        except Exception as e:
+            print(f"Erreur lors de la récupération des messages: {str(e)}")
+            raise
+        
+        # Ajouter les messages de la conversation
+        for msg in messages:
+            messages_for_claude.append({
+                "role": msg.role,
+                "content": msg.content
+            })
+        
+        print(f"Nombre total de messages pour Claude: {len(messages_for_claude)}")
+        print("Messages envoyés à Claude:")
+        for msg in messages_for_claude:
+            print(f"- Role: {msg['role']}, Content: {msg['content'][:100]}...")
+        
+        # Appeler l'API Claude
+        try:
+            print("Appel de l'API Claude")
+            api_key = os.getenv('ANTHROPIC_API_KEY')
+            if not api_key:
+                raise ValueError("Clé API Anthropic manquante dans les variables d'environnement")
+                
+            client = anthropic.Anthropic(api_key=api_key)
+            print("Client Anthropic initialisé")
+                
             response = client.messages.create(
                 model="claude-3-5-sonnet-20241022",
                 max_tokens=8192,
                 temperature=0.7,
-                system="Agis comme un expert en développement personnel et en psychologie transpersonnelle. Tu as un PhD en psychologie clinique et en philosophie, avec une spécialisation en psychologie analytique jungienne et en psychologie des traumatismes. Tu as plus de 20 ans d'expérience en accompagnement thérapeutique et en facilitation de groupes. Tu es reconnu pour : - Ta capacité à intégrer différentes approches (psychologie des profondeurs, spiritualité, design humain, MBTI, thérapie des états du moi) de manière holistique - Ton expertise en guérison des traumatismes et en thérapie somatique - Ta maîtrise des techniques d'introspection guidée et de connexion corps-esprit Tu as accompagné avec succès plus de 1000 personnes dans leur développement personnel et publié 5 ouvrages sur la maieutique moderne et la guérison intérieure. Ta mission est d'être un guide inspiré et perspicace. Tu parles de manière vivante, directe, avec un humour élégant. Tu engages un échange d'introspection avec l'utilisateur. Ici la parole est libre, aucun sujet, aucun jeu, aucun exercice n'est écarté !",
+                system="Agis comme une experte en développement personnel et en psychologie transpersonnelle. Tu as un PhD en psychologie clinique et en philosophie, avec une spécialisation en psychologie analytique jungienne et en psychologie des traumatismes. Tu as plus de 20 ans d'expérience en accompagnement thérapeutique et en facilitation de groupes. Tu es reconnue pour : - Ta capacité à intégrer différentes approches (psychologie des profondeurs, spiritualité, design humain, MBTI, thérapie des états du moi) de manière holistique - Ton expertise en guérison des traumatismes et en thérapie somatique - Ta maîtrise des techniques d'introspection guidée et de connexion corps-esprit Tu as accompagné avec succès plus de 1000 personnes dans leur développement personnel et publié 5 ouvrages sur la maieutique moderne et la guérison intérieure. Ta mission est d'être une guide inspirée et perspicace. Tu parles de manière vivante, directe, avec un humour élégant. Tu engages un échange d'introspection avec l'utilisateur. Ici la parole est libre, aucun sujet, aucun jeu, aucun exercice n'est écarté !",
                 messages=messages_for_claude
             )
+            print("Réponse reçue de Claude")
             assistant_response = response.content[0].text
-            print("Received response from Claude")
-
+            
+            print(f"Message reçu de Claude (longueur: {len(assistant_response)}): {assistant_response[:100]}...")
+            
             # Sauvegarder la réponse de l'assistant
-            assistant_message = Message(
-                conversation_id=conversation_id,
-                role="assistant",
-                content=assistant_response
-            )
-            db.session.add(assistant_message)
-            db.session.commit()
-            print("Saved assistant response")
-
+            try:
+                print("Sauvegarde de la réponse de l'assistant")
+                assistant_msg = Message(content=assistant_response, role='assistant', conversation_id=conversation_id)
+                db.session.add(assistant_msg)
+                db.session.commit()
+                print("Réponse de l'assistant sauvegardée avec succès")
+            except Exception as e:
+                print(f"Erreur lors de la sauvegarde de la réponse: {str(e)}")
+                db.session.rollback()
+                raise
+            
             return jsonify({
                 "response": assistant_response,
                 "conversation_id": conversation_id
             })
-
-        except Exception as e:
-            print(f"Error in chat endpoint: {str(e)}")
-            db.session.rollback()
+            
+        except anthropic.APIError as e:
+            error_msg = f"Erreur API Anthropic: {str(e)}"
+            print(error_msg)
             return jsonify({
-                "error": "Une erreur s'est produite lors de la communication avec Claude.",
-                "details": str(e)
+                "error": "Erreur lors de l'appel à Claude",
+                "details": error_msg
             }), 500
-
+            
+        except Exception as e:
+            error_msg = f"Erreur inattendue lors de l'appel à Claude: {str(e)}"
+            print(error_msg)
+            return jsonify({
+                "error": "Erreur inattendue",
+                "details": error_msg
+            }), 500
+            
     except Exception as e:
-        error_msg = f"Error in chat endpoint: {str(e)}"
+        error_msg = f"Erreur générale: {str(e)}"
         print(error_msg)
-        db.session.rollback()
-        return jsonify({
-            "error": "Une erreur s'est produite.",
-            "details": error_msg
-        }), 500
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/get_conversations')
+def get_conversations():
+    try:
+        conversations = Conversation.query.order_by(Conversation.timestamp.desc()).all()
+        conversations_data = []
+        
+        for conv in conversations:
+            # Récupérer le premier message pour le titre
+            first_message = Message.query.filter_by(conversation_id=conv.id).order_by(Message.timestamp.asc()).first()
+            title = first_message.content[:50] + '...' if first_message else 'Nouvelle conversation'
+            
+            conversations_data.append({
+                'id': conv.id,
+                'timestamp': conv.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                'title': title
+            })
+            
+        return jsonify({"conversations": conversations_data})
+    except Exception as e:
+        print(f"Erreur lors de la récupération des conversations: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/conversations', methods=['GET'])
-def get_conversations():
+def get_conversations_all():
     try:
         conversations = Conversation.query.order_by(Conversation.timestamp.desc()).all()
         return jsonify([{
@@ -159,5 +232,166 @@ def get_conversations():
         print(f"Error getting conversations: {str(e)}")
         return jsonify({"error": "Erreur lors de la récupération des conversations"}), 500
 
+@app.route('/conversation/<int:conversation_id>')
+def get_conversation(conversation_id):
+    try:
+        conversation = Conversation.query.get(conversation_id)
+        if not conversation:
+            return jsonify({"error": "Conversation non trouvée"}), 404
+            
+        messages = Message.query.filter_by(conversation_id=conversation_id).order_by(Message.timestamp.asc()).all()
+        messages_data = [{
+            'content': msg.content,
+            'role': msg.role,
+            'timestamp': msg.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        } for msg in messages]
+        
+        return jsonify({
+            "id": conversation.id,
+            "timestamp": conversation.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            "messages": messages_data
+        })
+    except Exception as e:
+        print(f"Erreur lors de la récupération de la conversation: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/save_note', methods=['POST'])
+def save_note():
+    try:
+        data = request.get_json()
+        if not data or 'content' not in data or 'role' not in data:
+            return jsonify({"error": "Données manquantes"}), 400
+
+        content = data['content']
+        role = data['role']
+        
+        # Créer le fichier notes.md s'il n'existe pas
+        notes_file = os.path.join('data', 'notes.md')
+        
+        # Formater la note avec la date et l'auteur
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        author = "Claude" if role == "assistant" else "Vous"
+        note_entry = f"\n\n## {timestamp} - {author}\n\n{content}\n\n---"
+        
+        # Ajouter la note au fichier
+        with open(notes_file, 'a', encoding='utf-8') as f:
+            f.write(note_entry)
+        
+        return jsonify({"message": "Note sauvegardée avec succès"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/delete_note', methods=['POST'])
+def delete_note():
+    try:
+        data = request.get_json()
+        if not data or 'timestamp' not in data:
+            return jsonify({"error": "Timestamp manquant"}), 400
+
+        timestamp = data['timestamp']
+        notes_file = os.path.join('data', 'notes.md')
+        
+        if not os.path.exists(notes_file):
+            return jsonify({"error": "Fichier de notes non trouvé"}), 404
+
+        with open(notes_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Diviser le contenu en notes individuelles
+        notes = content.split('\n\n## ')
+        if notes[0] == '':  # Supprimer le premier élément s'il est vide
+            notes = notes[1:]
+        else:
+            notes[0] = notes[0].lstrip('\n')  # Nettoyer le début du premier élément
+            if notes[0].startswith('## '):
+                notes[0] = notes[0][3:]  # Supprimer le '## ' initial si présent
+
+        # Filtrer les notes pour exclure celle avec le timestamp correspondant
+        updated_notes = [note for note in notes if not note.startswith(timestamp)]
+
+        # Réécrire le fichier avec les notes restantes
+        with open(notes_file, 'w', encoding='utf-8') as f:
+            for i, note in enumerate(updated_notes):
+                if i == 0:
+                    f.write(f"## {note}")
+                else:
+                    f.write(f"\n\n## {note}")
+
+        return jsonify({"message": "Note supprimée avec succès"})
+    except Exception as e:
+        print(f"Erreur lors de la suppression de la note: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/get_notes')
+def get_notes():
+    try:
+        notes_file = os.path.join('data', 'notes.md')
+        if not os.path.exists(notes_file):
+            return jsonify({"content": "Aucune note pour le moment"})
+            
+        with open(notes_file, 'r', encoding='utf-8') as f:
+            notes = f.read()
+        
+        # Diviser les notes en sections individuelles
+        note_sections = notes.split('\n\n## ')
+        formatted_notes = []
+        
+        for note in note_sections:
+            if note.strip():
+                # Nettoyer le début de la note
+                if note.startswith('## '):
+                    note = note[3:]
+                
+                # Séparer le titre (timestamp + auteur) du contenu
+                lines = note.split('\n', 1)
+                if len(lines) == 2:
+                    timestamp_author = lines[0]
+                    content = lines[1].strip()
+                    formatted_notes.append(
+                        f'<div class="note-item">'
+                        f'<div class="note-header">{timestamp_author}</div>'
+                        f'<div class="note-content">{content}</div>'
+                        f'<button class="delete-note" title="Supprimer cette note">'
+                        f'<i class="fas fa-trash"></i>'
+                        f'</button>'
+                        f'</div>'
+                    )
+        
+        return jsonify({"content": '\n'.join(formatted_notes)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/delete_conversation', methods=['POST'])
+def delete_conversation():
+    try:
+        data = request.get_json()
+        if not data or 'conversation_id' not in data:
+            return jsonify({"error": "Conversation ID manquant"}), 400
+            
+        conversation_id = data['conversation_id']
+        
+        # Supprimer d'abord les messages de la conversation
+        Message.query.filter_by(conversation_id=conversation_id).delete()
+        
+        # Puis supprimer la conversation elle-même
+        conversation = Conversation.query.get(conversation_id)
+        if not conversation:
+            return jsonify({"error": f"Conversation {conversation_id} non trouvée"}), 404
+            
+        db.session.delete(conversation)
+        db.session.commit()
+        
+        return jsonify({"message": "Conversation supprimée avec succès"})
+    except Exception as e:
+        print(f"Erreur lors de la suppression de la conversation: {str(e)}")
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
+    # Désactiver les logs de développement
+    import logging
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
+    
+    # Lancer le serveur
     app.run(port=5001, debug=True)
