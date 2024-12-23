@@ -48,91 +48,125 @@ def internal_error(error):
 @app.route('/chat', methods=['POST'])
 def chat():
     try:
-        print("\n=== Début de la requête chat ===")
         data = request.get_json()
-        print(f"Données reçues: {data}")
-        
-        if not data or 'message' not in data:
-            print("Erreur: message manquant dans les données")
-            return jsonify({"error": "Message manquant"}), 400
-            
+        user_message = data.get('message')
         conversation_id = data.get('conversation_id')
-        user_message = data['message']
         is_edit = data.get('is_edit', False)
-        print(f"conversation_id: {conversation_id}, message: {user_message}, is_edit: {is_edit}")
+        message_id = data.get('message_id')
         
-        # Créer une nouvelle conversation si nécessaire
-        if not conversation_id:
-            print("Création d'une nouvelle conversation")
-            conversation = Conversation()
-            db.session.add(conversation)
-            db.session.commit()
-            conversation_id = conversation.id
-            print(f"Nouvelle conversation créée avec l'ID: {conversation_id}")
-            
-        # Si c'est une édition, supprimer les deux derniers messages
-        if is_edit:
-            print("Mode édition : suppression des deux derniers messages")
+        print(f"Message reçu: {user_message}")
+        print(f"Conversation ID: {conversation_id}")
+        print(f"Is edit: {is_edit}")
+        print(f"Message ID: {message_id}")
+        
+        # Si c'est une édition avec un message_id
+        if is_edit and message_id:
+            print(f"Mode édition : édition du message {message_id}")
             try:
-                # Récupérer les deux derniers messages de la conversation
-                last_messages = Message.query.filter_by(conversation_id=conversation_id).order_by(Message.timestamp.desc()).limit(2).all()
+                print(f"Recherche du message avec l'ID: {message_id}")
+                # Récupérer le message à éditer
+                old_user_msg = Message.query.get(message_id)
+                print(f"Message trouvé: {old_user_msg}")
                 
-                # Les supprimer de la base de données
-                for msg in last_messages:
-                    db.session.delete(msg)
-                db.session.commit()
-                print(f"Suppression de {len(last_messages)} messages")
+                if old_user_msg:
+                    # Sauvegarder l'ID de conversation et le timestamp
+                    conversation_id = old_user_msg.conversation_id
+                    old_timestamp = old_user_msg.timestamp
+                    print(f"ID de conversation: {conversation_id}, Timestamp: {old_timestamp}")
+                    
+                    # Trouver la réponse associée (le message assistant suivant)
+                    old_assistant_msg = Message.query.filter(
+                        Message.conversation_id == conversation_id,
+                        Message.timestamp > old_user_msg.timestamp,
+                        Message.role == 'assistant'
+                    ).order_by(Message.timestamp.asc()).first()
+                    print(f"Réponse associée trouvée: {old_assistant_msg}")
+                    
+                    # Supprimer ces deux messages précis
+                    db.session.delete(old_user_msg)
+                    if old_assistant_msg:
+                        db.session.delete(old_assistant_msg)
+                    db.session.commit()
+                    print("Messages supprimés avec succès")
+                    
+                    # Créer le nouveau message utilisateur avec le même timestamp
+                    user_msg = Message(
+                        content=user_message,
+                        role='user',
+                        conversation_id=conversation_id,
+                        timestamp=old_timestamp
+                    )
+                    db.session.add(user_msg)
+                    db.session.commit()
+                    print(f"Nouveau message utilisateur créé avec ID: {user_msg.id}")
+                else:
+                    print(f"Message {message_id} non trouvé dans la base de données")
+                    return jsonify({"error": "Message à éditer non trouvé"}), 404
+                    
             except Exception as e:
                 print(f"Erreur lors de la suppression des messages: {str(e)}")
                 db.session.rollback()
                 raise
-        
-        # Sauvegarder le message utilisateur
-        try:
-            print("Sauvegarde du message utilisateur")
-            user_msg = Message(content=user_message, role='user', conversation_id=conversation_id)
+                
+        # Si pas d'édition ou pas de message_id
+        else:
+            # Créer une nouvelle conversation si nécessaire
+            if not conversation_id:
+                conversation = Conversation()
+                db.session.add(conversation)
+                db.session.commit()
+                conversation_id = conversation.id
+                print(f"Nouvelle conversation créée avec ID: {conversation_id}")
+                
+                # Stocker les notes comme premier message
+                notes_content = get_notes_content()
+                if notes_content:
+                    notes_msg = Message(
+                        content=f"Voici mes notes précédentes, utilise-les pour personnaliser tes réponses :\n\n{notes_content}",
+                        role='user',
+                        conversation_id=conversation_id
+                    )
+                    db.session.add(notes_msg)
+                    db.session.commit()
+                    print("Notes insérées en tant que premier message")
+            
+            # Créer le message utilisateur
+            user_msg = Message(
+                content=user_message,
+                role='user',
+                conversation_id=conversation_id
+            )
             db.session.add(user_msg)
             db.session.commit()
-            print("Message utilisateur sauvegardé avec succès")
-        except Exception as e:
-            print(f"Erreur lors de la sauvegarde du message utilisateur: {str(e)}")
-            db.session.rollback()
-            raise
+            print(f"Message utilisateur créé avec ID: {user_msg.id}")
         
         # Initialiser la liste des messages pour Claude
         messages_for_claude = []
-        
-        # Si c'est une nouvelle conversation, commencer par les notes
-        if not data.get('conversation_id'):
-            print("Lecture des notes pour nouvelle conversation")
-            notes_content = get_notes_content()
-            if notes_content:
-                print("Notes trouvées, ajout au contexte")
-                messages_for_claude.append({
-                    "role": "user",
-                    "content": f"Voici mes notes précédentes, utilise-les pour personnaliser tes réponses :\n\n{notes_content}"
-                })
         
         # Récupérer tous les messages de la conversation
         try:
             print("Récupération des messages de la conversation")
             messages = Message.query.filter_by(conversation_id=conversation_id).order_by(Message.timestamp.asc()).all()
             print(f"Nombre de messages trouvés: {len(messages)}")
+            
+            # Ajouter les messages de la conversation avec le nouveau format
+            for msg in messages:
+                messages_for_claude.append({
+                    "role": msg.role,
+                    "content": [{
+                        "type": "text",
+                        "text": msg.content
+                    }]
+                })
+            
+            print(f"Nombre total de messages pour Claude: {len(messages_for_claude)}")
+            print("Messages envoyés à Claude:")
+            for msg in messages_for_claude:
+                print(f"- Role: {msg['role']}, Content: {msg['content'][0]['text'][:100]}...")
+                
         except Exception as e:
             print(f"Erreur lors de la récupération des messages: {str(e)}")
             raise
-        
-        # Ajouter les messages de la conversation
-        for msg in messages:
-            messages_for_claude.append({
-                "role": msg.role,
-                "content": msg.content
-            })
-        
-        print(f"Nombre total de messages pour Claude: {len(messages_for_claude)}")
-        print("Messages envoyés à Claude:")
-        for msg in messages_for_claude:
-            print(f"- Role: {msg['role']}, Content: {msg['content'][:100]}...")
         
         # Appeler l'API Claude
         try:
@@ -162,7 +196,7 @@ def chat():
                 assistant_msg = Message(content=assistant_response, role='assistant', conversation_id=conversation_id)
                 db.session.add(assistant_msg)
                 db.session.commit()
-                print("Réponse de l'assistant sauvegardée avec succès")
+                print(f"Réponse de l'assistant sauvegardée avec ID: {assistant_msg.id}")
             except Exception as e:
                 print(f"Erreur lors de la sauvegarde de la réponse: {str(e)}")
                 db.session.rollback()
@@ -170,7 +204,10 @@ def chat():
             
             return jsonify({
                 "response": assistant_response,
-                "conversation_id": conversation_id
+                "conversation_id": conversation_id,
+                "message_id": user_msg.id,
+                "assistant_message_id": assistant_msg.id,
+                "success": True
             })
             
         except anthropic.APIError as e:
@@ -235,44 +272,82 @@ def get_conversations_all():
 @app.route('/conversation/<int:conversation_id>')
 def get_conversation(conversation_id):
     try:
-        conversation = Conversation.query.get(conversation_id)
-        if not conversation:
+        # Récupérer tous les messages de la conversation
+        messages = Message.query.filter_by(conversation_id=conversation_id).order_by(Message.timestamp).all()
+        
+        if not messages:
             return jsonify({"error": "Conversation non trouvée"}), 404
             
-        messages = Message.query.filter_by(conversation_id=conversation_id).order_by(Message.timestamp.asc()).all()
-        messages_data = [{
-            'content': msg.content,
-            'role': msg.role,
-            'timestamp': msg.timestamp.strftime('%Y-%m-%d %H:%M:%S')
-        } for msg in messages]
-        
+        # Convertir les messages en format JSON
+        messages_json = []
+        for msg in messages:
+            # Ne pas inclure les messages de notes dans l'interface
+            if "Voici mes notes précédentes" not in msg.content:
+                messages_json.append({
+                    'id': msg.id,  # S'assurer que l'ID est inclus
+                    'content': msg.content,
+                    'role': msg.role,
+                    'timestamp': msg.timestamp.isoformat() if msg.timestamp else None
+                })
+                print(f"Message envoyé: ID={msg.id}, content={msg.content[:50]}...")
+            
         return jsonify({
-            "id": conversation.id,
-            "timestamp": conversation.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-            "messages": messages_data
+            "messages": messages_json,
+            "conversation_id": conversation_id
         })
+        
     except Exception as e:
         print(f"Erreur lors de la récupération de la conversation: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/check_note', methods=['POST'])
 def check_note():
-    data = request.json
-    text = data.get('text')
-    
-    if not text:
-        return jsonify({'error': 'Texte manquant'}), 400
-    
-    # Lire le fichier des notes
     try:
-        with open('data/notes.md', 'r', encoding='utf-8') as f:
+        data = request.get_json()
+        text = data.get('text', '').strip()
+        
+        if not text:
+            return jsonify({'error': 'Texte vide'}), 400
+            
+        # Normaliser le texte pour la comparaison
+        def normalize_text(t):
+            # Supprimer les espaces multiples
+            t = ' '.join(t.split())
+            # Normaliser les retours à la ligne
+            t = '\n'.join(line.strip() for line in t.split('\n') if line.strip())
+            return t
+            
+        normalized_text = normalize_text(text)
+        
+        # Lire le contenu du fichier notes.md
+        notes_path = os.path.join(app.root_path, 'data', 'notes.md')
+        if not os.path.exists(notes_path):
+            return jsonify({'saved': False})
+            
+        with open(notes_path, 'r', encoding='utf-8') as f:
             notes_content = f.read()
-            # Vérifier si le texte existe dans les notes
-            is_saved = text in notes_content
-            return jsonify({'saved': is_saved})
-    except FileNotFoundError:
-        return jsonify({'saved': False})
+            
+        # Extraire chaque note et normaliser
+        notes = []
+        current_note = []
+        for line in notes_content.split('\n'):
+            if line.startswith('Note de '):
+                if current_note:
+                    notes.append(normalize_text('\n'.join(current_note)))
+                current_note = []
+            elif current_note or line.strip():
+                current_note.append(line)
+                
+        if current_note:
+            notes.append(normalize_text('\n'.join(current_note)))
+            
+        # Vérifier si le texte normalisé existe dans les notes
+        is_saved = any(normalized_text in note for note in notes)
+            
+        return jsonify({'saved': is_saved})
+            
     except Exception as e:
+        print(f"Erreur lors de la vérification de la note: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/save_note', methods=['POST'])
