@@ -1,18 +1,18 @@
 :root {
-    --primary-color: #F9F4ED;      /* Vieux papier très clair - pour le fond */
-    --secondary-color: #F5E6D3;    /* Vieux papier clair - pour les messages utilisateur */
-    --accent-color: #E8D4BE;       /* Vieux papier foncé - pour les bordures */
-    --text-color: #2C3E50;         /* Bleu-gris foncé */
-    --text-color-light: #6B7280;   /* Gris clair */
-    --background-color: #FFFFFF;    /* Blanc pour le fond des messages assistant */
-    --user-message-bg: #F5E6D3;    /* Couleur de fond pour les messages utilisateur */
-    --border-color: #E8D4BE;       /* Même que l'accent pour la cohérence */
-    --bg-color: #F9F4ED;           /* Vieux papier très clair */
-    --accent-color-dark: #C9B59B;  /* Accent color foncé */
-    --accent-color-rgb: 232, 181, 155;  /* Accent color en RGB */
-    --error-color: #f44336;        /* Couleur d'erreur */
-    --error-color-dark: #e91e63;   /* Couleur d'erreur foncé */
-    --background-color-light: #F7F4EC;  /* Fond clair */
+    --primary-color: #2D2F2E;      /* Fond principal sombre */
+    --secondary-color: #3A3B3C;    /* Fond secondaire légèrement plus clair */
+    --accent-color: #4A4B4C;       /* Accent pour les éléments interactifs */
+    --text-color: #E8E8E8;         /* Texte principal clair */
+    --text-color-light: #A0A0A0;   /* Texte secondaire gris clair */
+    --background-color: #2D2F2E;   /* Fond des messages assistant */
+    --user-message-bg: #3A3B3C;    /* Fond des messages utilisateur */
+    --border-color: #4A4B4C;       /* Couleur des bordures */
+    --bg-color: #2D2F2E;           /* Fond global */
+    --accent-color-dark: #5A5B5C;  /* Accent foncé */
+    --accent-color-rgb: 74, 75, 76;  /* Accent en RGB */
+    --error-color: #f44336;        /* Rouge erreur */
+    --error-color-dark: #e91e63;   /* Rouge erreur foncé */
+    --background-color-light: #3A3B3C;  /* Fond clair */
 }
 
 body {
@@ -356,43 +356,60 @@ body {
 }
 
 .edit-button {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    background: transparent;
+    background: none;
     border: none;
-    color: var(--text-color);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.message:hover .edit-button {
-    opacity: 0.4;
+    cursor: pointer;
+    padding: 5px;
+    margin-right: 10px;
+    transition: all 0.2s ease;
+    color: #666;
 }
 
 .edit-button:hover {
-    opacity: 1 !important;
+    color: #333;
+    transform: scale(1.1);
 }
 
-.message .edit-button {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    padding: 0.3rem 0.6rem;
-    background-color: transparent;
-    border: 1px solid var(--accent-color);
-    border-radius: 5px;
+.edit-textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: inherit;
+    resize: vertical;
+}
+
+.edit-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.edit-buttons button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
     cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.3s ease, background-color 0.3s ease;
+    font-weight: 500;
+    transition: all 0.2s ease;
 }
 
-.message:hover .edit-button {
-    opacity: 1;
+.edit-buttons button:first-child {
+    background-color: #4CAF50;
+    color: white;
 }
 
-.message .edit-button:hover {
-    background-color: var(--secondary-color);
+.edit-buttons button:last-child {
+    background-color: #f44336;
+    color: white;
+}
+
+.edit-buttons button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
 }
 
 .message.editing {
@@ -501,15 +518,18 @@ body {
     overflow-y: auto;
 }
 
+.modal.show {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
 .modal-content {
-    background-color: #fff;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    background-color: var(--secondary-color);
+    color: var(--text-color);
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
     width: 80%;
     max-width: 600px;
     max-height: 80vh;
@@ -523,11 +543,18 @@ body {
     font-size: 28px;
     font-weight: bold;
     cursor: pointer;
-    color: #666;
+    color: var(--text-color-light);
 }
 
 .close:hover {
-    color: #000;
+    color: var(--text-color);
+}
+
+.modal-body > .note-item,
+.modal-body > .note {
+    background-color: var(--primary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
 }
 
 .save-note-button {
@@ -593,18 +620,20 @@ body {
     font-family: inherit;
     font-size: inherit;
     resize: vertical;
+    background-color: var(--primary-color);
+    color: var(--text-color);
 }
 
 .notes-display {
     max-height: 400px;
     overflow-y: auto;
     padding: 1rem;
-    background: var(--background-color);
+    background: var(--primary-color);
     border-radius: 5px;
 }
 
 .note-item {
-    background: white;
+    background: var(--secondary-color);
     border: 1px solid var(--border-color);
     border-radius: 5px;
     padding: 1rem;
@@ -619,6 +648,7 @@ body {
 }
 
 .note-content {
+    color: var(--text-color);
     white-space: pre-wrap;
     line-height: 1.5;
 }
@@ -687,18 +717,20 @@ body {
     font-family: inherit;
     font-size: inherit;
     resize: vertical;
+    background-color: var(--primary-color);
+    color: var(--text-color);
 }
 
 .notes-display {
     max-height: 400px;
     overflow-y: auto;
     padding: 1rem;
-    background: var(--background-color);
+    background: var(--primary-color);
     border-radius: 5px;
 }
 
 .note-item {
-    background: white;
+    background: var(--secondary-color);
     border: 1px solid var(--border-color);
     border-radius: 5px;
     padding: 1rem;
@@ -713,6 +745,7 @@ body {
 }
 
 .note-content {
+    color: var(--text-color);
     white-space: pre-wrap;
     line-height: 1.5;
 }
@@ -747,5 +780,42 @@ body {
     to {
         transform: translateX(0);
         opacity: 1;
+    }
+}
+
+/* Animation des trois points */
+.typing-indicator {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    min-width: 60px;
+}
+
+.typing-indicator span {
+    height: 8px;
+    width: 8px;
+    margin: 0 2px;
+    background-color: var(--text-color-light);
+    border-radius: 50%;
+    opacity: 0.4;
+    animation: typing 1s infinite;
+}
+
+.typing-indicator span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typing {
+    0%, 100% {
+        transform: translateY(0);
+        opacity: 0.4;
+    }
+    50% {
+        transform: translateY(-5px);
+        opacity: 0.8;
     }
 }

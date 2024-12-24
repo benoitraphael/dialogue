@@ -13,7 +13,8 @@ class Message(db.Model):
     conversation_id = db.Column(db.Integer, db.ForeignKey('conversation.id'), nullable=False)
     role = db.Column(db.String(50), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    parent_id = db.Column(db.Integer, db.ForeignKey('message.id'), nullable=True)
 
     def to_dict(self):
         return {

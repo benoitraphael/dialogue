@@ -1,23 +1,31 @@
-# Laura - Assistant IA Personnel
+# Dialogue - Assistant IA avec Mémoire
 
-Une application de chat élégante utilisant l'API d'Anthropic pour créer un assistant virtuel nommé Laura.
+Une interface minimaliste et élégante pour avoir des conversations approfondies avec l'IA Claude d'Anthropic. L'application permet de sauvegarder des notes qui servent de "mémoire" à l'assistant, permettant ainsi d'approfondir progressivement les sujets de discussion.
+
+## Concept
+
+Dialogue est conçu pour faciliter des échanges de plus en plus profonds avec l'IA. Grâce à son système de notes intégré, chaque conversation peut s'enrichir des échanges précédents, permettant de :
+- Construire une base de connaissances personnalisée
+- Approfondir progressivement les sujets
+- Garder une trace des points importants
+- Créer une véritable continuité dans les échanges
 
 ## Fonctionnalités
 
-- 💬 Interface de chat intuitive et responsive
-- 📝 Édition des messages avec prévisualisation Markdown
-- 🗂️ Gestion des conversations multiples
-- 📌 Système de notes pour sauvegarder les informations importantes
-- 🎨 Design inspiré du papier ancien avec une touche moderne
-- ⌨️ Saisie de texte auto-redimensionnable
-- 🔄 Indicateur de chargement pendant la génération des réponses
+- 💬 Interface de chat épurée et intuitive
+- 🧠 Système de notes servant de "mémoire" à l'assistant
+- 🗂️ Gestion des conversations thématiques
+- 📝 Édition et organisation des notes
+- 🎨 Design sombre et minimaliste
+- ⌨️ Saisie intelligente
+- 🔄 Retours visuels élégants
 
 ## Installation
 
 1. Clonez le repository :
 ```bash
-git clone https://github.com/votre-username/laura-assistant.git
-cd laura-assistant
+git clone https://github.com/benoitraphael/mini-claude.git
+cd mini-claude
 ```
 
 2. Installez les dépendances :
@@ -32,33 +40,44 @@ export ANTHROPIC_API_KEY='votre-clé-api'
 
 4. Lancez l'application :
 ```bash
-python app.py
+python app.py --port 5001
 ```
 
 5. Ouvrez votre navigateur à l'adresse : `http://localhost:5001`
 
 ## Technologies Utilisées
 
-- Backend : Flask, SQLite
-- Frontend : JavaScript vanilla, HTML5, CSS3
-- API : Anthropic Claude
+- Backend : 
+  - Flask pour le serveur web
+  - SQLite pour le stockage des conversations et notes
+  - API Anthropic Claude (modèle claude-3-5-sonnet-20241022)
+
+- Frontend : 
+  - JavaScript vanilla
+  - HTML5/CSS3 moderne
+  - Design System minimaliste
+
 - Bibliothèques : 
-  - Marked.js pour le rendu Markdown
-  - DOMPurify pour la sécurité XSS
-  - Highlight.js pour la coloration syntaxique
-  - Font Awesome pour les icônes
+  - Marked.js (rendu Markdown)
+  - DOMPurify (sécurité XSS)
+  - Highlight.js (coloration syntaxique)
+  - Font Awesome (icônes)
 
-## Dernières Mises à Jour
+## Caractéristiques Clés
 
-- ✨ Amélioration de l'interface d'édition des messages
-- 🎯 Correction des bugs d'affichage du textarea
-- 🎨 Harmonisation des styles avec la charte graphique
-- 📱 Meilleure gestion du responsive design
-- 🔄 Optimisation des animations et transitions
+- Interface utilisateur minimaliste favorisant la concentration
+- Système de notes intégré servant de mémoire contextuelle
+- Conversations thématiques pour organiser les échanges
+- Design sombre apaisant pour les longues sessions
+- Gestion asynchrone des échanges
+- Expérience responsive sur tous les appareils
 
 ## Contribution
 
-Les contributions sont les bienvenues ! N'hésitez pas à ouvrir une issue ou soumettre une pull request.
+Les contributions sont les bienvenues ! N'hésitez pas à :
+- Ouvrir une issue pour signaler un bug
+- Proposer des améliorations
+- Soumettre une pull request
 
 ## Licence
 

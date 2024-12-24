@@ -103,64 +103,74 @@ async function addMessage(text, className) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${className}`;
     
-    const messageContent = document.createElement('div');
-    messageContent.className = 'message-content';
+    // Créer le conteneur de contenu
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
     
-    const messageText = document.createElement('div');
-    messageText.className = 'message-text';
+    // Créer le conteneur de texte
+    const textDiv = document.createElement('div');
+    textDiv.className = 'message-text';
+    textDiv.textContent = text;
     
-    // Appliquer la coloration syntaxique si nécessaire
-    if (className === 'assistant-message') {
-        messageText.innerHTML = marked.parse(text);
-        // Appliquer highlight.js aux blocs de code
-        messageText.querySelectorAll('pre code').forEach((block) => {
-            hljs.highlightBlock(block);
-        });
-    } else {
-        messageText.textContent = text;
+    // Ajouter le texte au conteneur de contenu
+    contentDiv.appendChild(textDiv);
+    
+    // Créer le conteneur des boutons
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'message-buttons';
+    
+    // Créer le bouton d'édition (uniquement pour les messages utilisateur)
+    if (className === 'user-message') {
+        const editButton = document.createElement('button');
+        editButton.className = 'edit-button';
+        editButton.innerHTML = '<i class="fas fa-edit"></i>';
+        editButton.onclick = () => editMessage(messageDiv);
+        buttonContainer.appendChild(editButton);
     }
     
-    const saveButton = document.createElement('button');
-    saveButton.className = 'save-note-button';
-    saveButton.innerHTML = '<i class="far fa-bookmark"></i>';
-    saveButton.title = 'Sauvegarder comme note';
+    // Créer le bouton de sauvegarde en note
+    const saveNoteButton = document.createElement('button');
+    saveNoteButton.className = 'save-note-button';
+    saveNoteButton.innerHTML = '<i class="far fa-bookmark"></i>';
     
-    // Ajouter l'événement de clic pour la sauvegarde
-    saveButton.onclick = async (e) => {
-        e.preventDefault();
-        console.log('Clic sur sauvegarder pour le message:', text);
-        try {
-            const role = className === 'user-message' ? 'user' : 'assistant';
-            await saveNote(text, messageDiv, role);
-        } catch (error) {
-            console.error('Erreur lors de la sauvegarde:', error);
-        }
-    };
+    // Vérifier si le message est déjà sauvegardé
+    const isSaved = await checkIfNoteSaved(text);
+    if (isSaved) {
+        saveNoteButton.innerHTML = '<i class="fas fa-bookmark"></i>';
+    }
     
-    messageContent.appendChild(messageText);
-    messageContent.appendChild(saveButton);
-    messageDiv.appendChild(messageContent);
+    saveNoteButton.onclick = () => saveNote(text, saveNoteButton);
+    buttonContainer.appendChild(saveNoteButton);
     
+    // Ajouter les boutons au conteneur de contenu
+    contentDiv.appendChild(buttonContainer);
+    
+    // Ajouter le conteneur de contenu au message
+    messageDiv.appendChild(contentDiv);
+    
+    // Ajouter le message à la liste
     messages.appendChild(messageDiv);
-    messages.scrollTop = messages.scrollHeight;
+    
+    // Faire défiler jusqu'au nouveau message
+    messageDiv.scrollIntoView({ behavior: 'smooth' });
     
     return messageDiv;
 }
 
-async function saveNote(text, messageDiv, role) {
-    if (!messageDiv || !messageDiv.querySelector) {
-        console.error('messageDiv invalide:', messageDiv);
+async function saveNote(text, saveButton) {
+    if (!saveButton || !saveButton.querySelector) {
+        console.error('saveButton invalide:', saveButton);
         return false;
     }
 
     try {
-        console.log('Tentative de sauvegarde de la note:', { text, role });
+        console.log('Tentative de sauvegarde de la note:', { text });
         const response = await fetch('/save_note', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ text, role })
+            body: JSON.stringify({ text })
         });
 
         if (!response.ok) {
@@ -174,18 +184,9 @@ async function saveNote(text, messageDiv, role) {
             throw new Error('Pas de timestamp dans la réponse');
         }
 
-        // Mettre à jour l'icône et le timestamp
-        const saveButton = messageDiv.querySelector('.save-note-button');
-        if (saveButton) {
-            saveButton.classList.add('saved');
-            saveButton.querySelector('i').classList.remove('far');
-            saveButton.querySelector('i').classList.add('fas');
-        }
+        // Mettre à jour l'icône
+        saveButton.innerHTML = '<i class="fas fa-bookmark"></i>';
         
-        // Stocker le timestamp sur le message pour la suppression future
-        messageDiv.setAttribute('data-timestamp', data.timestamp);
-        console.log('Message mis à jour avec timestamp:', data.timestamp);
-
         showNotification('Note sauvegardée !');
         return true;
     } catch (error) {
@@ -215,61 +216,222 @@ function handleSendClick() {
 
 async function sendMessage() {
     const userInput = document.getElementById('message-input');
-    const message = userInput.value.trim();
+    const userMessage = userInput.value.trim();
     
-    if (!message) return;
-
-    // Ajouter le message de l'utilisateur
-    addMessage(message, 'user-message');
+    if (!userMessage) return;
     
-    // Effacer l'input et réinitialiser sa hauteur
-    userInput.value = '';
-    userInput.style.height = 'auto';
-    
-    // Afficher l'indicateur de frappe
-    showTypingIndicator();
+    // Désactiver l'input pendant l'envoi
+    userInput.disabled = true;
     
     try {
+        // Ajouter le message de l'utilisateur
+        const messageDiv = await addMessage(userMessage, 'user-message');
+        userInput.value = '';
+        autoResizeTextarea(userInput);
+        
+        // Afficher l'indicateur de frappe
+        showTypingIndicator();
+        
+        // Envoyer le message au serveur
         const response = await fetch('/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                message: message,
-                conversation_id: currentConversationId,
-                is_edit: false
+                message: userMessage,
+                conversation_id: currentConversationId
             })
         });
-
+        
         if (!response.ok) {
             throw new Error('Erreur lors de l\'envoi du message');
         }
-
+        
         const data = await response.json();
+        console.log('Réponse du serveur:', data);
+        
+        // Mettre à jour currentConversationId avec celui retourné par le serveur
+        if (data.conversation_id) {
+            currentConversationId = data.conversation_id;
+            console.log('Conversation ID mis à jour:', currentConversationId);
+        }
         
         // Cacher l'indicateur de frappe
         hideTypingIndicator();
         
-        if (data.error) {
-            throw new Error(data.error);
-        }
-
-        // Mettre à jour l'ID de la conversation si c'est une nouvelle conversation
-        if (data.conversation_id && !currentConversationId) {
-            currentConversationId = data.conversation_id;
-            loadConversations();  // Recharger la liste des conversations
-        }
-
-        // Ajouter la réponse de l'assistant
-        if (data.response) {
-            addMessage(data.response, 'assistant-message');
+        // Si le message a un ID, le stocker
+        if (data.message_id) {
+            console.log('Attribution de l\'ID au message utilisateur:', data.message_id);
+            messageDiv.dataset.messageId = data.message_id.toString();
         }
         
+        // Ajouter la réponse de l'assistant
+        if (data.response) {
+            const assistantDiv = await addMessage(data.response, 'assistant-message');
+            if (data.assistant_message_id) {
+                console.log('Attribution de l\'ID au message assistant:', data.assistant_message_id);
+                assistantDiv.dataset.messageId = data.assistant_message_id.toString();
+            }
+        }
+        
+        // Recharger la liste des conversations
+        loadConversations();
+        
     } catch (error) {
-        console.error('Error:', error);
-        hideTypingIndicator();
-        showNotification(error.message, true);
+        console.error('Erreur:', error);
+        showNotification('Erreur lors de l\'envoi du message', true);
+    } finally {
+        // Réactiver l'input
+        userInput.disabled = false;
+        userInput.focus();
+    }
+}
+
+function editMessage(messageDiv) {
+    if (!messageDiv) return;
+    
+    // Si un message est déjà en cours d'édition, annuler
+    if (editingMessage) {
+        cancelEdit();
+    }
+    
+    // Stocker la référence au message en cours d'édition
+    editingMessage = messageDiv;
+    
+    // Récupérer le texte actuel
+    const textDiv = messageDiv.querySelector('.message-text');
+    if (!textDiv) return;
+    
+    const currentText = textDiv.textContent;
+    
+    // Vérifier que le message a un ID
+    const messageId = messageDiv.dataset.messageId;
+    if (!messageId) {
+        console.error('Message sans ID:', messageDiv);
+        showNotification('Impossible d\'éditer ce message : ID manquant', true);
+        return;
+    }
+    console.log('Edition du message avec ID:', messageId);
+    
+    // Créer la zone de texte
+    const textarea = document.createElement('textarea');
+    textarea.value = currentText;
+    textarea.className = 'edit-textarea';
+    autoResizeTextarea(textarea);
+    
+    // Créer les boutons de sauvegarde et d'annulation
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'edit-buttons';
+    
+    const saveButton = document.createElement('button');
+    saveButton.className = 'save-button';
+    saveButton.innerHTML = '<i class="fas fa-check"></i>';
+    saveButton.onclick = () => saveEdit(textarea.value);
+    
+    const cancelButton = document.createElement('button');
+    cancelButton.className = 'cancel-button';
+    cancelButton.innerHTML = '<i class="fas fa-times"></i>';
+    cancelButton.onclick = cancelEdit;
+    
+    buttonContainer.appendChild(saveButton);
+    buttonContainer.appendChild(cancelButton);
+    
+    // Remplacer le texte par la zone de texte et les boutons
+    const contentDiv = messageDiv.querySelector('.message-content');
+    if (contentDiv) {
+        // Sauvegarder les boutons existants
+        const existingButtons = contentDiv.querySelector('.message-buttons');
+        
+        // Vider le contenu
+        contentDiv.innerHTML = '';
+        
+        // Ajouter la zone de texte et les nouveaux boutons
+        contentDiv.appendChild(textarea);
+        contentDiv.appendChild(buttonContainer);
+        
+        // Restaurer les boutons existants
+        if (existingButtons) {
+            contentDiv.appendChild(existingButtons);
+        }
+        
+        // Mettre le focus sur la zone de texte
+        textarea.focus();
+    }
+}
+
+function cancelEdit() {
+    if (!editingMessage) return;
+    
+    const messageText = editingMessage.querySelector('.edit-textarea');
+    if (!messageText) return;
+    
+    // Restaurer le texte original depuis l'attribut data
+    const originalText = editingMessage.dataset.originalText || '';
+    
+    // Restaurer le texte original
+    const messageContent = editingMessage.querySelector('.message-content');
+    messageContent.innerHTML = '<div class="message-text">' + originalText + '</div>';
+    
+    // Réinitialiser la référence
+    editingMessage = null;
+}
+
+async function saveEdit(newText) {
+    if (!editingMessage) return;
+    
+    // Sauvegarder une référence locale au message en cours d'édition
+    const messageDiv = editingMessage;
+    
+    try {
+        // Récupérer l'ID du message depuis l'attribut data
+        const messageId = messageDiv.dataset.messageId;
+        console.log('Message ID à éditer:', messageId);
+        
+        if (!messageId) {
+            throw new Error('ID du message non trouvé');
+        }
+        
+        // Envoyer le message édité au serveur avec l'ID
+        console.log('Envoi de la requête avec:', {
+            message: newText,
+            conversation_id: currentConversationId,
+            is_edit: true,
+            message_id: messageId
+        });
+        
+        const response = await fetch('/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: newText,
+                conversation_id: currentConversationId,
+                is_edit: true,
+                message_id: messageId
+            })
+        });
+        
+        const data = await response.json();
+        console.log('Réponse du serveur:', data);
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Erreur lors de la sauvegarde');
+        }
+        
+        // Réinitialiser la référence avant de recharger
+        editingMessage = null;
+        
+        // Recharger toute la conversation
+        await loadConversation(currentConversationId);
+        
+    } catch (error) {
+        console.error('Erreur lors de la sauvegarde:', error);
+        showNotification(error.message || 'Erreur lors de la sauvegarde', true);
+        
+        // En cas d'erreur, restaurer l'affichage original
+        cancelEdit();
     }
 }
 
@@ -383,19 +545,21 @@ function deleteConversation(conversationId) {
 }
 
 function loadConversation(conversationId) {
+    // Mettre à jour currentConversationId
     currentConversationId = conversationId;
+    
     const messages = document.getElementById('messages');
     messages.innerHTML = '';
     
     // Mettre à jour la sélection visuelle
     document.querySelectorAll('.conversation-item').forEach(item => {
-        if (item.dataset.id === conversationId.toString()) {
+        if (item.dataset.id === (conversationId ? conversationId.toString() : '')) {
             item.classList.add('selected');
         } else {
             item.classList.remove('selected');
         }
     });
-    
+        
     fetch(`/conversation/${conversationId}`)
         .then(response => {
             if (!response.ok) {
@@ -403,11 +567,23 @@ function loadConversation(conversationId) {
             }
             return response.json();
         })
-        .then(data => {
+        .then(async data => {
+            console.log('Messages reçus du serveur:', data.messages);
             if (data.messages && Array.isArray(data.messages)) {
-                data.messages.forEach(msg => {
-                    addMessage(msg.content, msg.role === 'user' ? 'user-message' : 'assistant-message');
-                });
+                for (const msg of data.messages) {
+                    const messageDiv = await addMessage(
+                        msg.content,
+                        msg.role === 'user' ? 'user-message' : 'assistant-message'
+                    );
+                    
+                    // Stocker l'ID de la base de données
+                    if (msg.id) {
+                        console.log(`Attribution de l'ID ${msg.id} au message:`, msg.content);
+                        messageDiv.dataset.messageId = msg.id.toString();
+                    } else {
+                        console.warn('Message sans ID:', msg);
+                    }
+                }
             }
         })
         .catch(error => {
@@ -423,201 +599,6 @@ function startNewConversation() {
         item.classList.remove('selected');
     });
     showNotification('Nouvelle conversation démarrée');
-}
-
-function editMessage(messageDiv) {
-    // Si on est déjà en train d'éditer un message, on annule
-    if (editingMessage) {
-        cancelEdit();
-        return;
-    }
-
-    editingMessage = messageDiv;
-    const textDiv = messageDiv.querySelector('.message-text');
-    const originalText = textDiv.textContent;
-
-    // Ajouter la classe editing
-    messageDiv.classList.add('editing');
-
-    // Créer la zone de texte
-    const textarea = document.createElement('textarea');
-    textarea.className = 'edit-textarea';
-    textarea.value = originalText;
-    textarea.rows = 1;
-
-    // Créer les boutons d'action
-    const actionsDiv = document.createElement('div');
-    actionsDiv.className = 'edit-actions';
-
-    const saveButton = document.createElement('button');
-    saveButton.className = 'action-button save-button';
-    saveButton.innerHTML = '<i class="fas fa-check"></i> Sauvegarder';
-    saveButton.onclick = () => saveEdit(textarea.value);
-
-    const cancelButton = document.createElement('button');
-    cancelButton.className = 'action-button cancel-button';
-    cancelButton.innerHTML = '<i class="fas fa-times"></i> Annuler';
-    cancelButton.onclick = cancelEdit;
-
-    actionsDiv.appendChild(saveButton);
-    actionsDiv.appendChild(cancelButton);
-
-    // Remplacer le contenu du message
-    textDiv.replaceWith(textarea);
-    messageDiv.appendChild(actionsDiv);
-
-    // Masquer le bouton d'édition original
-    const editButton = messageDiv.querySelector('.edit-button');
-    if (editButton) {
-        editButton.style.display = 'none';
-    }
-
-    // Ajuster la hauteur du textarea
-    textarea.style.height = 'auto';
-    textarea.style.height = textarea.scrollHeight + 'px';
-    textarea.focus();
-}
-
-function cancelEdit() {
-    if (!editingMessage) return;
-
-    // Récupérer les éléments
-    const textarea = editingMessage.querySelector('.edit-textarea');
-    const actionsDiv = editingMessage.querySelector('.edit-actions');
-    const editButton = editingMessage.querySelector('.edit-button');
-
-    if (!textarea || !actionsDiv) return;
-
-    // Enlever la classe editing
-    editingMessage.classList.remove('editing');
-
-    // Créer un nouveau div pour le texte
-    const textDiv = document.createElement('div');
-    textDiv.className = 'message-text';
-    textDiv.innerHTML = DOMPurify.sanitize(marked.parse(textarea.value));
-
-    // Restaurer l'affichage
-    textarea.replaceWith(textDiv);
-    actionsDiv.remove();
-    if (editButton) {
-        editButton.style.display = '';
-    }
-
-    editingMessage = null;
-}
-
-async function saveEdit(newText) {
-    if (!editingMessage || !newText.trim()) return;
-
-    try {
-        const response = await fetch('/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                message: newText,
-                conversation_id: currentConversationId,
-                is_edit: true
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error('Erreur lors de l\'édition');
-        }
-
-        const data = await response.json();
-        
-        if (data.error) {
-            throw new Error(data.error);
-        }
-
-        // Créer le nouveau message
-        const newMessage = document.createElement('div');
-        newMessage.className = editingMessage.className;
-        
-        const textDiv = document.createElement('div');
-        textDiv.className = 'message-text';
-        textDiv.innerHTML = DOMPurify.sanitize(marked.parse(newText));
-        
-        // Ajouter le bouton d'édition
-        const editButton = document.createElement('button');
-        editButton.className = 'edit-button';
-        editButton.innerHTML = '<i class="fas fa-edit"></i>';
-        editButton.onclick = () => editMessage(newMessage);
-        
-        newMessage.appendChild(textDiv);
-        newMessage.appendChild(editButton);
-        
-        // Remplacer l'ancien message
-        editingMessage.replaceWith(newMessage);
-        editingMessage = null;
-
-        // Ajouter la réponse de l'assistant si présente
-        if (data.response) {
-            addMessage(data.response, 'assistant-message');
-        }
-
-    } catch (error) {
-        console.error('Erreur lors de l\'édition:', error);
-        showNotification(error.message, true);
-    }
-}
-
-function displayMessage(content, role) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${role}-message`;
-    
-    const textDiv = document.createElement('div');
-    textDiv.className = 'message-text';
-    textDiv.innerHTML = DOMPurify.sanitize(marked.parse(content));
-    messageDiv.appendChild(textDiv);
-    
-    // Ajouter le bouton d'édition uniquement pour les messages utilisateur
-    if (role === 'user') {
-        const actionsDiv = document.createElement('div');
-        actionsDiv.className = 'message-actions';
-        
-        const editButton = document.createElement('button');
-        editButton.className = 'edit-button';
-        editButton.textContent = 'Éditer';
-        editButton.onclick = () => editMessage(messageDiv);
-        actionsDiv.appendChild(editButton);
-        
-        messageDiv.appendChild(actionsDiv);
-    }
-    
-    document.getElementById('messages').appendChild(messageDiv);
-    messageDiv.scrollIntoView({ behavior: 'smooth' });
-    
-    // Appliquer la coloration syntaxique
-    messageDiv.querySelectorAll('pre code').forEach((block) => {
-        hljs.highlightElement(block);
-    });
-    
-    return messageDiv;
-}
-
-function displayErrorMessage(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-message';
-    errorDiv.innerHTML = `
-        <div class="error-content">
-            <i class="fas fa-exclamation-circle"></i>
-            <span>${message}</span>
-        </div>
-        <button onclick="this.parentElement.remove()" class="error-close">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-    document.querySelector('.chat-container').appendChild(errorDiv);
-    
-    // Auto-hide after 10 seconds
-    setTimeout(() => {
-        if (errorDiv.parentElement) {
-            errorDiv.remove();
-        }
-    }, 10000);
 }
 
 function showTypingIndicator() {
@@ -708,21 +689,19 @@ async function loadNotes() {
         
     } catch (error) {
         console.error('Erreur lors du chargement des notes:', error);
-        displayErrorMessage("Erreur lors du chargement des notes");
+        showNotification("Erreur lors du chargement des notes");
     }
 }
 
 async function openNotesModal() {
-    console.log('Ouverture de la modal des notes');
     const modal = document.getElementById('notes-modal');
-    modal.style.display = 'block';
-    await loadNotes();
+    modal.classList.add('show');
+    loadNotes();
 }
 
 function closeNotesModal() {
-    console.log('Fermeture de la modal des notes');
     const modal = document.getElementById('notes-modal');
-    modal.style.display = 'none';
+    modal.classList.remove('show');
 }
 
 // Gestionnaire pour fermer la modal quand on clique en dehors
