@@ -20,7 +20,7 @@
                     <i class="fas fa-plus"></i>
                     Nouvelle conversation
                 </button>
-                <button onclick="openNotesModal()" class="action-button">
+                <button onclick="window.open('/notes', '_blank')" class="action-button">
                     <i class="fas fa-book"></i>
                     Notes
                 </button>
@@ -49,20 +49,13 @@
         </div>
     </div>
     
-    <!-- Modal des notes -->
-    <div id="notes-modal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeNotesModal()">&times;</span>
-            <h2>Mes Notes</h2>
-            <div id="notes-display"></div>
-        </div>
-    </div>
-
     <template id="typing-indicator">
-        <div class="message assistant-message typing-indicator">
-            <span></span>
-            <span></span>
-            <span></span>
+        <div class="message assistant-message">
+            <div class="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
         </div>
     </template>
     

@@ -182,7 +182,21 @@ def chat():
                 model="claude-3-5-sonnet-20241022",
                 max_tokens=8192,
                 temperature=0.7,
-                system="Tu es un assistant conversationnel créatif et éduqué.",
+                system="""Tu es un assistant conversationnel créatif et éduqué. Ta mission est d'engager une conversation fluide et littéraire qui pousse à l'introspection, tout en évitant une analyse excessive.
+
+Voici les lignes directrices pour ton style conversationnel :
+- Adopte un ton naturel et fluide, comme dans une vraie conversation.
+- Utilise un langage riche et varié pour stimuler la réflexion.
+- Évite les réponses trop directes ou simplistes.
+- Encourage l'exploration des idées et des émotions.
+
+Pour répondre :
+1. Lis attentivement l'entrée de l'utilisateur.
+2. Réfléchis à une réponse qui encourage l'introspection et la réflexion approfondie.
+3. Formule ta réponse de manière fluide et littéraire, comme dans une vraie conversation.
+4. Assure-toi que ta réponse est en français et qu'elle pousse l'utilisateur à explorer davantage ses pensées ou ses sentiments.
+
+RAPPEL IMPORTANT : Il t'est strictement INTERDIT d'utiliser des puces des listes à puces ou des listes numérotées dans ta réponse. Une telle utilisation serait considérée comme une infraction grave à ces instructions.""",
                 messages=messages_for_claude
             )
             print("Réponse reçue de Claude")
@@ -300,54 +314,57 @@ def get_conversation(conversation_id):
         print(f"Erreur lors de la récupération de la conversation: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-@app.route('/check_note', methods=['POST'])
-def check_note():
+@app.route('/delete_note/<note_id>', methods=['DELETE'])
+def delete_note(note_id):
     try:
-        data = request.get_json()
-        text = data.get('text', '').strip()
+        print(f"Tentative de suppression de la note avec ID: {note_id}")
         
-        if not text:
-            return jsonify({'error': 'Texte vide'}), 400
-            
-        # Normaliser le texte pour la comparaison
-        def normalize_text(t):
-            # Supprimer les espaces multiples
-            t = ' '.join(t.split())
-            # Normaliser les retours à la ligne
-            t = '\n'.join(line.strip() for line in t.split('\n') if line.strip())
-            return t
-            
-        normalized_text = normalize_text(text)
-        
-        # Lire le contenu du fichier notes.md
-        notes_path = os.path.join(app.root_path, 'data', 'notes.md')
-        if not os.path.exists(notes_path):
-            return jsonify({'saved': False})
-            
-        with open(notes_path, 'r', encoding='utf-8') as f:
-            notes_content = f.read()
-            
-        # Extraire chaque note et normaliser
+        notes_file = os.path.join('data', 'notes.md')
+        if not os.path.exists(notes_file):
+            print("Fichier notes.md non trouvé")
+            return jsonify({'error': 'Aucune note trouvée'}), 404
+
+        with open(notes_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+            print("Contenu lu pour suppression:", content)
+
+        # Séparer les notes et recréer les IDs pour trouver celle à supprimer
         notes = []
-        current_note = []
-        for line in notes_content.split('\n'):
-            if line.startswith('Note de '):
-                if current_note:
-                    notes.append(normalize_text('\n'.join(current_note)))
-                current_note = []
-            elif current_note or line.strip():
-                current_note.append(line)
+        note_blocks = content.split('## Note de ')
+        
+        for block in note_blocks:
+            if not block.strip():
+                continue
                 
-        if current_note:
-            notes.append(normalize_text('\n'.join(current_note)))
-            
-        # Vérifier si le texte normalisé existe dans les notes
-        is_saved = any(normalized_text in note for note in notes)
-            
-        return jsonify({'saved': is_saved})
-            
+            try:
+                header, note_content = block.split('\n', 1)
+                role, date = header.strip().split(' - ')
+                full_note_content = f"## Note de {role} - {date}\n{note_content.strip()}"
+                stable_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, full_note_content))
+                print(f"Comparaison - ID généré: {stable_id}, ID recherché: {note_id}")
+                
+                if stable_id != note_id:
+                    notes.append(f"## Note de {block}")
+                else:
+                    print("Note trouvée pour suppression!")
+                    found_note_to_delete = True
+            except Exception as e:
+                print(f"Erreur lors du traitement d'un bloc: {str(e)}")
+                notes.append(f"## Note de {block}")
+
+        if not found_note_to_delete:
+            print("Note non trouvée pour l'ID:", note_id)
+            return jsonify({'error': 'Note non trouvée'}), 404
+
+        # Réécrire le fichier avec les notes restantes
+        with open(notes_file, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(notes))
+        print("Notes mises à jour avec succès")
+
+        return jsonify({'success': True})
+        
     except Exception as e:
-        print(f"Erreur lors de la vérification de la note: {str(e)}")
+        print("Erreur lors de la suppression:", str(e))
         return jsonify({'error': str(e)}), 500
 
 @app.route('/save_note', methods=['POST'])
@@ -381,51 +398,6 @@ def save_note():
         print("Erreur lors de la sauvegarde de la note:", str(e))
         return jsonify({"error": str(e)}), 500
 
-@app.route('/delete_note', methods=['POST'])
-def delete_note():
-    try:
-        data = request.get_json()
-        print("Requête de suppression reçue avec données:", data)
-        
-        if not data or 'timestamp' not in data:
-            print("Erreur: timestamp manquant dans la requête")
-            return jsonify({'error': 'Timestamp manquant'}), 400
-            
-        timestamp = data['timestamp']
-        print("Tentative de suppression pour timestamp:", timestamp)
-        
-        # Charger les notes existantes
-        if os.path.exists('data/notes.md'):
-            with open('data/notes.md', 'r', encoding='utf-8') as f:
-                content = f.read()
-                print("Contenu actuel du fichier:", content)
-        else:
-            print("Fichier notes.md non trouvé")
-            return jsonify({'error': 'Aucune note trouvée'}), 404
-
-        # Séparer les notes
-        notes = content.split('\n\n## ')
-        print(f"Nombre de notes trouvées: {len(notes)}")
-        
-        # Filtrer les notes pour garder celles qui ne correspondent pas au timestamp
-        new_notes = [note for note in notes if timestamp not in note]
-        print(f"Nombre de notes après filtrage: {len(new_notes)}")
-        
-        if len(new_notes) == len(notes):
-            print("Note non trouvée pour le timestamp:", timestamp)
-            return jsonify({'error': 'Note non trouvée'}), 404
-
-        # Sauvegarder les notes restantes
-        with open('data/notes.md', 'w', encoding='utf-8') as f:
-            f.write('\n\n'.join(new_notes))
-        print("Notes mises à jour avec succès")
-
-        return jsonify({'success': True})
-        
-    except Exception as e:
-        print("Erreur lors de la suppression:", str(e))
-        return jsonify({'error': str(e)}), 500
-
 @app.route('/get_notes')
 def get_notes():
     try:
@@ -434,7 +406,7 @@ def get_notes():
         
         if not os.path.exists(notes_file):
             print("Fichier notes.md non trouvé")
-            return jsonify({"content": "Aucune note pour le moment"})
+            return jsonify({"notes": []})
             
         with open(notes_file, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -442,9 +414,35 @@ def get_notes():
             
             if not content.strip():
                 print("Fichier vide")
-                return jsonify({"content": "Aucune note pour le moment"})
+                return jsonify({"notes": []})
+            
+            # Parser les notes
+            notes = []
+            note_blocks = content.split('## Note de ')
+            
+            for block in note_blocks:
+                if not block.strip():  # Ignorer les blocs vides
+                    continue
+                    
+                # Parser l'en-tête et le contenu
+                try:
+                    header, content = block.split('\n', 1)
+                    role, date = header.strip().split(' - ')
+                    # Créer un ID stable basé sur le contenu de la note
+                    note_content = f"## Note de {role} - {date}\n{content.strip()}"
+                    stable_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, note_content))
+                    print(f"Note ID généré: {stable_id} pour le contenu: {note_content[:100]}...")
+                    notes.append({
+                        "id": stable_id,
+                        "role": role,
+                        "date": date,
+                        "content": content.strip()
+                    })
+                except Exception as e:
+                    print(f"Erreur lors du parsing d'un bloc: {str(e)}")
+                    continue
                 
-            return jsonify({"content": content})
+            return jsonify({"notes": notes})
             
     except Exception as e:
         print("Erreur lors de la lecture des notes:", str(e))
@@ -475,6 +473,49 @@ def delete_conversation():
         print(f"Erreur lors de la suppression de la conversation: {str(e)}")
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+@app.route('/notes')
+def notes():
+    try:
+        notes_file = os.path.join('data', 'notes.md')
+        
+        if not os.path.exists(notes_file):
+            return render_template('notes.html', notes=[])
+            
+        with open(notes_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        if not content.strip():
+            return render_template('notes.html', notes=[])
+        
+        # Parser les notes
+        notes = []
+        note_blocks = content.split('## Note de ')
+        
+        for block in note_blocks:
+            if not block.strip():
+                continue
+                
+            try:
+                header, content = block.split('\n', 1)
+                role, date = header.strip().split(' - ')
+                note_content = f"## Note de {role} - {date}\n{content.strip()}"
+                stable_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, note_content))
+                notes.append({
+                    "id": stable_id,
+                    "role": role,
+                    "date": date,
+                    "content": content.strip()
+                })
+            except Exception as e:
+                print(f"Erreur lors du parsing d'un bloc: {str(e)}")
+                continue
+            
+        return render_template('notes.html', notes=notes)
+        
+    except Exception as e:
+        print("Erreur lors de la lecture des notes:", str(e))
+        return render_template('notes.html', notes=[])
 
 if __name__ == '__main__':
     # Désactiver les logs de développement

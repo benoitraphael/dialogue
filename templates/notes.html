@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notes - Dialogue</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="notes-page">
+    <div class="app-container">
+        <div class="chat-container">
+            <header>
+                <h1>Mes Notes</h1>
+                <a href="/" class="back-to-chat">Retour au chat</a>
+            </header>
+            
+            <div class="messages-container">
+                {% if notes %}
+                    {% for note in notes %}
+                    <div class="note-item">
+                        <div class="note-header">Note de {{ note.role }} - {{ note.date }}</div>
+                        <div class="note-content">{{ note.content }}</div>
+                        <button class="delete-note" onclick="deleteNote('{{ note.id }}', this)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-notes">Aucune note pour le moment</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/notes.js') }}"></script>
+</body>
+</html>
