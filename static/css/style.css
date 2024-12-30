@@ -639,9 +639,11 @@ body {
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1.5rem;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
     position: relative;
-    min-height: calc(100vh - 200px); /* Pour que la note prenne presque toute la hauteur de la fenêtre */
+    width: fit-content;
+    min-width: 300px;
+    max-width: 100%;
 }
 
 .note-header {
@@ -812,4 +814,31 @@ body.notes-page {
         transform: scale(1.2);
         opacity: 1;
     }
+}
+
+.notes-stats {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+#word-count {
+    font-size: 0.9rem;
+    color: var(--text-color-light);
+}
+
+.memory-alert {
+    color: var(--error-color);
+    font-weight: bold;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    background-color: rgba(244, 67, 54, 0.1);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
 }

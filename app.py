@@ -182,7 +182,7 @@ def chat():
                 model="claude-3-5-sonnet-20241022",
                 max_tokens=8192,
                 temperature=0.7,
-                system="""Tu es un assistant conversationnel créatif et éduqué. Ta mission est d'engager une conversation fluide et littéraire qui pousse à l'introspection, tout en évitant une analyse excessive.
+                system="""Tu es un partenaire conversationnel créatif et éduqué. Ta mission est d'engager une conversation fluide et littéraire qui pousse à l'introspection, tout en évitant une analyse excessive.
 
 Voici les lignes directrices pour ton style conversationnel :
 - Adopte un ton naturel et fluide, comme dans une vraie conversation.
