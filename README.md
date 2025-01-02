@@ -25,7 +25,14 @@ Ouvrez un terminal (Command Prompt sous Windows, Terminal sous Mac) :
 cd chemin/vers/le/dossier/dialogue
 ```
 
-2. Créez un environnement virtuel :
+2. (Recommandé) Créez un environnement virtuel :
+> 💡 Un environnement virtuel crée une "bulle" isolée pour votre projet. C'est recommandé car :
+> - Évite les conflits entre différents projets Python
+> - Garde votre système propre
+> - Facilite le partage du projet
+> 
+> Si vous débutez, vous pouvez sauter cette étape, mais c'est une bonne pratique à prendre !
+
 ```bash
 # Windows
 python -m venv venv
@@ -38,7 +45,15 @@ source venv/bin/activate
 
 3. Installez les dépendances :
 ```bash
+# Si vous utilisez un environnement virtuel
 pip install -r requirements.txt
+
+# Si vous n'utilisez pas d'environnement virtuel
+# Windows
+python -m pip install -r requirements.txt
+
+# Mac/Linux
+python3 -m pip install -r requirements.txt
 ```
 
 ### Étape 4 : Configurer votre clé API Anthropic
