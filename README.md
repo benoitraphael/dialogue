@@ -28,11 +28,27 @@ C'est comme avoir un assistant personnel brillant, patient et organisé, qui s'a
 
 ## 🚀 Installation
 
-### Étape 1 : Télécharger le projet
+### Étape 1 : Télécharger et décompresser le projet
 
 1. Cliquez sur le bouton vert "Code" en haut de cette page
 2. Cliquez sur "Download ZIP"
-3. Décompressez le fichier ZIP dans un dossier sur votre ordinateur
+3. Trouvez le fichier ZIP téléchargé :
+   - Sur Windows : Généralement dans le dossier "Téléchargements"
+   - Sur Mac : Dans le dossier "Downloads"
+
+4. Décompressez le fichier :
+   - Sur Windows : Faites un clic droit sur le fichier ZIP et choisissez "Extraire tout..."
+     - Choisissez un emplacement facile à retrouver (par exemple : `C:\Users\VotreNom\Documents\dialogue`)
+     - Cliquez sur "Extraire"
+   
+   - Sur Mac : Double-cliquez sur le fichier ZIP
+     - Le dossier sera décompressé au même endroit que le ZIP
+     - Vous pouvez le déplacer dans un endroit plus pratique (par exemple : dans votre dossier "Documents")
+
+> 💡 **Important** : 
+> - Notez bien où vous décompressez le dossier, vous en aurez besoin plus tard
+> - Le dossier décompressé devrait contenir un sous-dossier `app` - c'est là que se trouve l'application
+> - Évitez les emplacements avec des caractères spéciaux ou des espaces dans le chemin
 
 ### Étape 2 : Installer Python
 
@@ -40,16 +56,59 @@ C'est comme avoir un assistant personnel brillant, patient et organisé, qui s'a
 2. Téléchargez la dernière version de Python pour votre système
 3. Lancez l'installation en cochant "Add Python to PATH"
 
-### Étape 3 : Installer les dépendances
+### Étape 3 : Préparer votre espace de travail
 
-Ouvrez un terminal (Command Prompt sous Windows, Terminal sous Mac) :
+1. Créez un nouveau dossier pour le projet :
+   - Sur Windows :
+     - Ouvrez "Ce PC" ou l'explorateur de fichiers
+     - Allez dans le dossier "Documents"
+     - Clic droit → Nouveau → Dossier
+     - Nommez-le "dialogue"
 
-1. Naviguez vers le dossier du projet :
-```bash
-cd chemin/vers/le/dossier/dialogue
-```
+   - Sur Mac :
+     - Ouvrez le Finder
+     - Allez dans votre dossier "Documents"
+     - Cmd + Shift + N pour créer un nouveau dossier
+     - Nommez-le "dialogue"
 
-2. (Recommandé) Créez un environnement virtuel :
+2. Déplacez les fichiers :
+   - Ouvrez le dossier ZIP que vous avez téléchargé
+   - Copiez tout son contenu
+   - Collez-le dans le dossier "dialogue" que vous venez de créer
+
+3. Ouvrez un terminal :
+   - Sur Windows : 
+     - Appuyez sur la touche Windows + R
+     - Tapez "cmd" et appuyez sur Entrée
+
+   - Sur Mac : 
+     - Appuyez sur Cmd + Espace
+     - Tapez "terminal" et appuyez sur Entrée
+
+4. Dans le terminal, naviguez vers votre dossier :
+   ```bash
+   # Sur Windows
+   cd C:\Users\VotreNom\Documents\dialogue\app
+
+   # Sur Mac
+   cd ~/Documents/dialogue/app
+   ```
+
+   > 💡 **Astuce** : 
+   > - Sur Mac : Tapez `cd ` (avec un espace), puis glissez le dossier "app" depuis le Finder dans le terminal
+   > - Sur Windows : Dans l'explorateur, allez dans le dossier "app", puis Shift + Clic droit → "Ouvrir PowerShell ici"
+
+5. Vérifiez que vous êtes au bon endroit :
+   ```bash
+   # Tapez cette commande :
+   ls
+
+   # Vous devriez voir app.py dans la liste
+   ```
+
+### Étape 4 : Installer les dépendances
+
+1. (Recommandé) Créez un environnement virtuel :
 > 💡 Un environnement virtuel crée une "bulle" isolée pour votre projet. C'est recommandé car :
 > - Évite les conflits entre différents projets Python
 > - Garde votre système propre
@@ -67,12 +126,12 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
-3. Installez les dépendances :
+2. Installez les dépendances :
 ```bash
 # Si vous utilisez un environnement virtuel
 pip install -r requirements.txt
 
-# Si vous n'utilisez pas d'environnement virtuel
+# Si vous n'utilisee pas d'environnement virtuel
 # Windows
 python -m pip install -r requirements.txt
 
@@ -80,7 +139,7 @@ python -m pip install -r requirements.txt
 python3 -m pip install -r requirements.txt
 ```
 
-### Étape 4 : Configurer votre clé API Anthropic
+### Étape 5 : Configurer votre clé API Anthropic
 
 1. Créez un compte sur [Anthropic Console](https://console.anthropic.com/)
 2. Générez une clé API dans les paramètres de votre compte
@@ -90,7 +149,34 @@ python3 -m pip install -r requirements.txt
 
 ## 🎯 Lancer l'application
 
-1. Dans le terminal (avec l'environnement virtuel activé) :
+1. Ouvrez un terminal :
+   - Sur Windows : appuyez sur `Windows + R`, tapez `cmd` et appuyez sur Entrée
+   - Sur Mac : appuyez sur `Cmd + Espace`, tapez `terminal` et appuyez sur Entrée
+
+2. Dans le terminal, naviguez jusqu'au dossier où vous avez décompressé le projet :
+```bash
+# Par exemple, si votre dossier est dans "Documents/dialogue" :
+
+# Sur Windows
+cd C:\Users\VotreNom\Documents\dialogue\app
+
+# Sur Mac/Linux
+cd ~/Documents/dialogue/app
+```
+
+> 💡 **Astuce pour les débutants** : 
+> - Sur Mac, vous pouvez aussi ouvrir le terminal et taper `cd `, puis faire glisser le dossier `app` depuis le Finder dans le terminal
+> - Sur Windows, vous pouvez ouvrir le dossier `app` dans l'explorateur, faire Shift + Clic droit et choisir "Ouvrir PowerShell ici" ou "Ouvrir dans le terminal"
+
+3. Vérifiez que vous êtes dans le bon dossier :
+```bash
+# Tapez cette commande
+ls
+
+# Vous devriez voir app.py dans la liste des fichiers
+```
+
+4. Lancez l'application :
 ```bash
 # Windows
 python app.py
@@ -99,7 +185,12 @@ python app.py
 python3 app.py
 ```
 
-2. Ouvrez votre navigateur et allez sur : `http://localhost:5000`
+5. Ouvrez votre navigateur et allez sur : `http://localhost:5001`
+
+> 💡 **En cas de problème** :
+> - Vérifiez que vous voyez bien le fichier `app.py` quand vous tapez `ls`
+> - Vérifiez que l'URL dans votre navigateur est exactement `http://localhost:5001`
+> - Si vous voyez des erreurs dans le terminal, n'hésitez pas à ouvrir une "Issue" sur GitHub
 
 ## 🌟 Fonctionnalités
 
