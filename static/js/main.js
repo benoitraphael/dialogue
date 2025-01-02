@@ -16,6 +16,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Charger les conversations existantes
     loadConversations();
+    
+    // Gestion de la clé API
+    document.getElementById('api-config-button').addEventListener('click', openApiConfig);
+    document.getElementById('api-config-close').addEventListener('click', closeApiConfig);
+    document.getElementById('api-key-save').addEventListener('click', saveApiKey);
+    document.getElementById('api-key-test').addEventListener('click', testApiKey);
 });
 
 async function handleDeleteNote(timestamp) {
@@ -179,6 +185,12 @@ async function saveNote(text, saveButton, role) {
 function autoResizeTextarea(textarea) {
     textarea.style.height = 'auto';
     textarea.style.height = (textarea.scrollHeight) + 'px';
+    textarea.style.width = '100%';  // Force la largeur à 100%
+    textarea.style.resize = 'none';  // Empêche le redimensionnement manuel
+    textarea.style.overflowY = 'auto';  // Permet le défilement vertical si nécessaire
+    textarea.style.overflowX = 'hidden';  // Cache le défilement horizontal
+    textarea.style.whiteSpace = 'pre-wrap';  // Permet le retour à la ligne automatique
+    textarea.style.wordWrap = 'break-word';  // Force le retour à la ligne des mots longs
 }
 
 function handleKeyPress(e) {
@@ -733,4 +745,88 @@ async function checkIfNoteSaved(text) {
         console.error('Erreur lors de la vérification:', error);
         return false;
     }
+}
+
+// Fonctions de gestion de l'API
+function openApiConfig() {
+    document.getElementById('api-config-modal').style.display = 'block';
+    checkApiConfig();
+}
+
+function closeApiConfig() {
+    document.getElementById('api-config-modal').style.display = 'none';
+    document.getElementById('api-message').innerHTML = '';
+    document.getElementById('api-key-input').value = '';
+}
+
+async function checkApiConfig() {
+    try {
+        const response = await fetch('/api/config');
+        const data = await response.json();
+        
+        if (data.is_configured && data.api_key_masked) {
+            document.getElementById('api-key-input').value = data.api_key_masked;
+        } else {
+            document.getElementById('api-key-input').value = '';
+        }
+    } catch (error) {
+        console.error('Erreur lors de la vérification de la configuration:', error);
+        document.getElementById('api-key-input').value = '';
+    }
+}
+
+async function saveApiKey() {
+    const apiKey = document.getElementById('api-key-input').value.trim();
+    
+    if (!apiKey) {
+        showApiMessage('Veuillez entrer une clé API', 'error');
+        return;
+    }
+    
+    if (!apiKey.startsWith('sk-ant-')) {
+        showApiMessage('Format de clé API invalide', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/config', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ api_key: apiKey })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showApiMessage(data.message, 'success');
+            document.getElementById('api-key-input').value = '';
+        } else {
+            showApiMessage(data.error, 'error');
+        }
+    } catch (error) {
+        showApiMessage('Erreur lors de la sauvegarde de la clé', 'error');
+    }
+}
+
+async function testApiKey() {
+    try {
+        const response = await fetch('/api/test');
+        const data = await response.json();
+        
+        if (response.ok) {
+            showApiMessage(data.message, 'success');
+        } else {
+            showApiMessage(data.error, 'error');
+        }
+    } catch (error) {
+        showApiMessage('Erreur lors du test de connexion', 'error');
+    }
+}
+
+function showApiMessage(message, type) {
+    const messageDiv = document.getElementById('api-message');
+    messageDiv.className = `api-message ${type}`;
+    messageDiv.textContent = message;
 }

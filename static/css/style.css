@@ -1,3 +1,162 @@
+/* Styles pour les boutons de la barre latérale */
+.sidebar-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 2rem;
+}
+
+/* Styles spécifiques pour les boutons du menu latéral */
+.sidebar-buttons .action-button,
+.sidebar-buttons .conversation-button {
+    width: 100%;
+    text-align: left;
+    padding: 0.8rem 1rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.sidebar-buttons .action-button {
+    background-color: var(--primary-color);
+    color: var(--text-color);
+}
+
+.sidebar-buttons .action-button:hover {
+    background-color: var(--secondary-color);
+}
+
+.sidebar-buttons .conversation-button {
+    background-color: transparent;
+    color: var(--text-color);
+}
+
+.sidebar-buttons .conversation-button:hover {
+    background-color: var(--secondary-color);
+}
+
+.sidebar-buttons .action-button i,
+.sidebar-buttons .conversation-button i {
+    width: 20px;
+    text-align: center;
+}
+
+/* Styles pour le champ de texte et son bouton d'envoi */
+.chat-input-container {
+    border-top: 1px solid var(--border-color);
+    background-color: var(--background-color);
+    padding: 1rem;
+    position: relative;
+    bottom: 0;
+    margin-bottom: 20px;
+}
+
+.chat-input {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.chat-input textarea {
+    flex: 1;
+    min-height: 24px;
+    padding: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--background-color);
+    color: var(--text-color);
+    font-size: 1rem;
+    line-height: 1.5;
+    resize: none;
+    overflow-y: auto;
+    width: 100%;
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed !important;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.chat-input textarea:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+/* Reset des styles de bouton */
+button {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* Style général pour les boutons d'action */
+.action-button {
+    background-color: var(--primary-color);
+    color: var(--text-color);
+    padding: 0.8rem 1rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.action-button:hover {
+    background-color: var(--secondary-color);
+}
+
+.action-button i {
+    width: 20px;
+    text-align: center;
+    color: var(--text-color);
+}
+
+/* Style spécifique pour le bouton d'envoi */
+#send-button {
+    padding: 0.6rem;
+    margin-left: 0.5rem;
+}
+
+#send-button i {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+/* Suppression de tous les autres styles qui pourraient interférer */
+.send-button *,
+.send-button i:before,
+.send-button i:after {
+    background: none !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+/* Style spécifique pour l'icône du bouton d'envoi */
+.send-button .fa-paper-plane,
+.send-button .far.fa-paper-plane {
+    background: none !important;
+    color: #ffffff;  /* Blanc pur */
+    opacity: 0.8;
+    font-size: 1.2rem;
+}
+
+.send-button:hover .fa-paper-plane,
+.send-button:hover .far.fa-paper-plane {
+    opacity: 1;
+}
+
 :root {
     --primary-color: #2D2F2E;      /* Fond principal sombre */
     --secondary-color: #3A3B3C;    /* Fond secondaire légèrement plus clair */
@@ -130,42 +289,6 @@ body {
     min-height: calc(100vh - 220px);
     gap: 1rem;
     min-height: 0;
-}
-
-.chat-input-container {
-    border-top: 1px solid var(--border-color);
-    background-color: var(--background-color);
-    padding: 1rem;
-    position: relative;
-    bottom: 0;
-    margin-bottom: 20px;
-}
-
-.chat-input {
-    display: flex;
-    gap: 0.5rem;
-    align-items: flex-start;
-    max-width: 1000px;
-    margin: 0 auto;
-}
-
-.chat-input textarea {
-    flex: 1;
-    min-height: 24px;
-    padding: 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    background: var(--background-color);
-    color: var(--text-color);
-    font-size: 1rem;
-    line-height: 1.5;
-    resize: none;
-    overflow-y: hidden;
-}
-
-.chat-input textarea:focus {
-    outline: none;
-    border-color: var(--accent-color);
 }
 
 .message {
@@ -512,173 +635,114 @@ body {
 .modal {
     display: none;
     position: fixed;
-    z-index: 1000;
-    left: 0;
     top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    overflow-y: auto;
-}
-
-.modal.show {
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
 }
 
 .modal-content {
-    background-color: var(--secondary-color);
-    color: var(--text-color);
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-    width: 80%;
+    background-color: #2b2c2e;
+    margin: 10% auto;
+    padding: 2rem;
+    border-radius: 12px;
+    width: 90%;
     max-width: 600px;
-    max-height: 80vh;
-    overflow-y: auto;
+    color: #ffffff;
 }
 
-.close {
-    position: absolute;
-    right: 20px;
-    top: 10px;
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-    color: var(--text-color-light);
+.modal-content h2 {
+    font-size: 2rem;
+    margin-bottom: 2rem;
+    font-weight: normal;
 }
 
-.close:hover {
-    color: var(--text-color);
+.modal-content h3 {
+    font-size: 1.2rem;
+    margin-bottom: 1.5rem;
+    font-weight: normal;
 }
 
-.modal-body > .note-item,
-.modal-body > .note {
-    background-color: var(--primary-color);
-    color: var(--text-color);
-    border: 1px solid var(--border-color);
-}
-
-.save-note-button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 5px;
-    margin-left: 10px;
-    transition: all 0.2s ease;
-}
-
-.save-note-button i {
-    color: #ccc;
-    font-size: 1.2em;
-    transition: color 0.2s ease;
-}
-
-.save-note-button.saved i {
-    color: #333;
-}
-
-.notes-actions {
+.api-form {
     display: flex;
-    justify-content: flex-end;
-    margin-bottom: 1rem;
+    flex-direction: column;
+    gap: 1.5rem;
 }
 
-#save-notes {
-    background-color: var(--accent-color);
-    color: var(--text-color);
+.api-form input {
+    padding: 1rem;
+    border: 1px solid #3a3b3d;
+    border-radius: 8px;
+    font-size: 1rem;
+    background-color: #1e1f21;
+    color: #ffffff;
+}
+
+.button-group {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 1rem;
+}
+
+.button-group .action-button {
+    padding: 0.8rem 1.5rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    background-color: #3a3b3d;
+    color: #ffffff;
     border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: background-color 0.2s;
+}
+
+.button-group .action-button:hover {
+    background-color: #4a4b4d;
+}
+
+.api-message {
+    padding: 0.8rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.api-message.success {
+    background-color: #28a745;
+    color: #ffffff;
+}
+
+.api-message.error {
+    background-color: #dc3545;
+    color: #ffffff;
+}
+
+.notes-stats {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 1rem;
+    margin: 1rem 0;
 }
 
-#save-notes:hover {
-    background-color: var(--accent-color);
-}
-
-#save-notes.saved {
-    background-color: var(--accent-color);
-}
-
-#save-notes i {
-    font-size: 1rem;
-}
-
-.notes-editor {
-    margin-bottom: 2rem;
-}
-
-.notes-editor textarea {
-    width: 100%;
-    min-height: 100px;
-    padding: 10px;
-    border: 1px solid var(--border-color);
-    border-radius: 5px;
-    font-family: inherit;
-    font-size: inherit;
-    resize: vertical;
-    background-color: var(--primary-color);
-    color: var(--text-color);
-}
-
-.notes-display {
-    max-height: 400px;
-    overflow-y: auto;
-    padding: 1rem;
-    background: var(--primary-color);
-    border-radius: 5px;
-}
-
-.note-item {
-    background-color: var(--background-color);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-    position: relative;
-    width: fit-content;
-    min-width: 300px;
-    max-width: 100%;
-}
-
-.note-header {
-    color: var(--text-color-light);
+#word-count {
     font-size: 0.9rem;
-    margin-bottom: 0.5rem;
+    color: var(--text-color-light);
 }
 
-.note-content {
-    color: var(--text-color);
-    white-space: pre-wrap;
-    line-height: 1.5;
+.memory-alert {
+    color: var(--error-color);
+    font-weight: bold;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    background-color: rgba(244, 67, 54, 0.1);
+    animation: pulse 2s infinite;
 }
 
-.delete-note {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    background: none;
-    border: none;
-    color: var(--accent-color);
-    cursor: pointer;
-    padding: 0.5rem;
-    transition: color 0.3s ease;
-}
-
-.delete-note:hover {
-    color: var(--accent-color);
-}
-
-/* Cacher l'ancien affichage des notes */
-.modal-body > .note-item,
-.modal-body > .note {
-    display: none !important;
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
 }
 
 /* Animation pour les messages */
@@ -765,6 +829,27 @@ body.notes-page {
     position: relative;
 }
 
+.delete-note {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    transition: opacity 0.2s;
+    color: var(--text-color);
+    opacity: 0.6;
+}
+
+.delete-note:hover {
+    opacity: 1;
+}
+
+.delete-note i {
+    font-size: 1.2rem;
+}
+
 @keyframes slideIn {
     from {
         transform: translateX(100%);
@@ -817,29 +902,17 @@ body.notes-page {
     }
 }
 
-.notes-stats {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin: 1rem 0;
+/* Styles pour les boutons du modal API */
+.modal .action-button {
+    background-color: var(--primary-color);
+    color: var(--text-color);
+    padding: 0.8rem 1rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
 }
 
-#word-count {
-    font-size: 0.9rem;
-    color: var(--text-color-light);
-}
-
-.memory-alert {
-    color: var(--error-color);
-    font-weight: bold;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    background-color: rgba(244, 67, 54, 0.1);
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
+.modal .action-button:hover {
+    background-color: var(--secondary-color);
 }

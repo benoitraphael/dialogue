@@ -6,6 +6,7 @@ from models import db, Message, Conversation
 from datetime import datetime
 import json
 import uuid
+from dotenv import load_dotenv, set_key
 
 app = Flask(__name__)
 CORS(app)
@@ -31,6 +32,20 @@ def get_notes_content():
     except Exception as e:
         print(f"Erreur lors de la lecture des notes: {str(e)}")
         return ""
+
+def mask_api_key(key):
+    if not key:
+        return ""
+    if len(key) < 12:
+        return key
+    return f"{key[:8]}{'*' * (len(key)-12)}{key[-4:]}"
+
+def is_valid_api_key(key):
+    return key and isinstance(key, str) and key.startswith('sk-ant-') and len(key) > 12
+
+def get_api_key():
+    key = os.getenv('ANTHROPIC_API_KEY', '')
+    return key if is_valid_api_key(key) else None
 
 @app.route('/')
 def home():
@@ -171,7 +186,7 @@ def chat():
         # Appeler l'API Claude
         try:
             print("Appel de l'API Claude")
-            api_key = os.getenv('ANTHROPIC_API_KEY')
+            api_key = get_api_key()
             if not api_key:
                 raise ValueError("Clé API Anthropic manquante dans les variables d'environnement")
                 
@@ -411,38 +426,38 @@ def get_notes():
         with open(notes_file, 'r', encoding='utf-8') as f:
             content = f.read()
             print("Contenu lu:", content)
-            
-            if not content.strip():
-                print("Fichier vide")
-                return jsonify({"notes": []})
-            
-            # Parser les notes
-            notes = []
-            note_blocks = content.split('## Note de ')
-            
-            for block in note_blocks:
-                if not block.strip():  # Ignorer les blocs vides
-                    continue
-                    
-                # Parser l'en-tête et le contenu
-                try:
-                    header, content = block.split('\n', 1)
-                    role, date = header.strip().split(' - ')
-                    # Créer un ID stable basé sur le contenu de la note
-                    note_content = f"## Note de {role} - {date}\n{content.strip()}"
-                    stable_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, note_content))
-                    print(f"Note ID généré: {stable_id} pour le contenu: {note_content[:100]}...")
-                    notes.append({
-                        "id": stable_id,
-                        "role": role,
-                        "date": date,
-                        "content": content.strip()
-                    })
-                except Exception as e:
-                    print(f"Erreur lors du parsing d'un bloc: {str(e)}")
-                    continue
+
+        if not content.strip():
+            print("Fichier vide")
+            return jsonify({"notes": []})
+        
+        # Parser les notes
+        notes = []
+        note_blocks = content.split('## Note de ')
+        
+        for block in note_blocks:
+            if not block.strip():  # Ignorer les blocs vides
+                continue
                 
-            return jsonify({"notes": notes})
+            # Parser l'en-tête et le contenu
+            try:
+                header, content = block.split('\n', 1)
+                role, date = header.strip().split(' - ')
+                # Créer un ID stable basé sur le contenu de la note
+                note_content = f"## Note de {role} - {date}\n{content.strip()}"
+                stable_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, note_content))
+                print(f"Note ID généré: {stable_id} pour le contenu: {note_content[:100]}...")
+                notes.append({
+                    "id": stable_id,
+                    "role": role,
+                    "date": date,
+                    "content": content.strip()
+                })
+            except Exception as e:
+                print(f"Erreur lors du parsing d'un bloc: {str(e)}")
+                continue
+                
+        return jsonify({"notes": notes})
             
     except Exception as e:
         print("Erreur lors de la lecture des notes:", str(e))
@@ -516,6 +531,66 @@ def notes():
     except Exception as e:
         print("Erreur lors de la lecture des notes:", str(e))
         return render_template('notes.html', notes=[])
+
+@app.route('/api/config', methods=['GET'])
+def get_api_config():
+    api_key = get_api_key()
+    return jsonify({
+        'is_configured': bool(api_key),
+        'api_key_masked': mask_api_key(api_key) if api_key else ""
+    })
+
+@app.route('/api/config', methods=['POST'])
+def update_api_config():
+    try:
+        data = request.get_json()
+        api_key = data.get('api_key')
+        
+        if not api_key:
+            return jsonify({'error': 'Clé API manquante'}), 400
+            
+        if not api_key.startswith('sk-ant-'):
+            return jsonify({'error': 'Format de clé API invalide'}), 400
+            
+        # Sauvegarder la clé dans .env
+        env_path = os.path.join(os.path.dirname(__file__), '.env')
+        
+        # Vérifier si le fichier .env existe, sinon le créer
+        if not os.path.exists(env_path):
+            with open(env_path, 'w') as f:
+                f.write('')
+        
+        set_key(env_path, 'ANTHROPIC_API_KEY', api_key)
+        os.environ['ANTHROPIC_API_KEY'] = api_key
+        
+        return jsonify({'message': 'Clé API sauvegardée avec succès'})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/test', methods=['GET'])
+def test_api():
+    try:
+        api_key = get_api_key()
+        if not api_key:
+            return jsonify({'error': 'Aucune clé API valide configurée. Veuillez configurer une clé API valide.'}), 400
+            
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=10,
+            messages=[{
+                "role": "user",
+                "content": [{"type": "text", "text": "Test de connexion"}]
+            }]
+        )
+        
+        return jsonify({'message': 'Connexion API réussie'})
+        
+    except anthropic.APIError as e:
+        return jsonify({'error': f'Erreur API Anthropic : {str(e)}'}), 400
+    except Exception as e:
+        return jsonify({'error': f'Erreur inattendue : {str(e)}'}), 500
 
 if __name__ == '__main__':
     # Désactiver les logs de développement

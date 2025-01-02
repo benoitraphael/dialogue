@@ -15,18 +15,24 @@
 <body>
     <div class="app-container">
         <div id="sidebar">
-            <div class="action-buttons">
-                <button onclick="startNewConversation()" class="action-button">
-                    <i class="fas fa-plus"></i>
-                    Nouvelle conversation
-                </button>
-                <button onclick="window.open('/notes', '_blank')" class="action-button">
-                    <i class="fas fa-book"></i>
-                    Notes
-                </button>
-            </div>
-            <div id="conversations-list">
-                <!-- La liste des conversations sera ajoutée ici dynamiquement -->
+            <div class="sidebar">
+                <div class="sidebar-buttons">
+                    <button onclick="startNewConversation()" class="action-button">
+                        <i class="fas fa-plus"></i>
+                        Nouvelle conversation
+                    </button>
+                    <button onclick="window.open('/notes', '_blank')" class="action-button">
+                        <i class="fas fa-book"></i>
+                        Notes
+                    </button>
+                    <button onclick="openApiConfig()" class="action-button">
+                        <i class="fas fa-key"></i>
+                        Configuration API Anthropic
+                    </button>
+                </div>
+                <div id="conversations-list">
+                    <!-- La liste des conversations sera ajoutée ici dynamiquement -->
+                </div>
             </div>
         </div>
         <div class="chat-container">
@@ -39,11 +45,28 @@
             </div>
             
             <div class="chat-input-container">
-                <div class="chat-input">
+                <form class="chat-input" onsubmit="sendMessage(event)">
                     <textarea id="message-input" placeholder="Partagez vos réflexions ou posez une question..." rows="1"></textarea>
-                    <button id="send-button" class="action-button">
-                        <i class="fas fa-paper-plane"></i>
+                    <button type="submit" id="send-button" class="action-button">
+                        <i class="far fa-paper-plane"></i>
                     </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Configuration API -->
+    <div id="api-config-modal" class="modal">
+        <div class="modal-content">
+            <h2>Configuration de l'API</h2>
+            <div class="api-form">
+                <h3>Entrez votre clé API Anthropic :</h3>
+                <input type="password" id="api-key-input" placeholder="Entrez votre clé API Anthropic (sk-ant-...)" />
+                <div id="api-message" class="api-message"></div>
+                <div class="button-group">
+                    <button onclick="testApiKey()" class="action-button">Tester</button>
+                    <button onclick="saveApiKey()" class="action-button">Sauvegarder</button>
+                    <button onclick="closeApiConfig()" class="action-button">Fermer</button>
                 </div>
             </div>
         </div>
