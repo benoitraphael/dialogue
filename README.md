@@ -1,6 +1,30 @@
 # Dialogue - Assistant IA avec Claude
 
-Une application web élégante et intuitive pour dialoguer avec Claude, l'assistant IA d'Anthropic.
+## 🎯 Présentation
+
+Imaginez une application qui vous permet d'avoir des conversations enrichissantes avec l'une des IA les plus avancées au monde, Claude d'Anthropic, mais dans une interface élégante et simple d'utilisation.
+
+"Dialogue" est comme un salon numérique privé où vous pouvez discuter avec un assistant intelligent qui :
+- Comprend vos questions en profondeur
+- Répond de manière claire et nuancée
+- Se souvient de vos conversations précédentes
+- Vous aide à organiser vos idées
+
+Ce qui rend cette application unique, c'est son approche minimaliste et ses fonctionnalités bien pensées :
+
+1. **Une interface épurée** : Pas de distractions, juste vous et l'assistant dans un environnement visuellement apaisant avec un mode sombre élégant.
+
+2. **Un système de mémoire intelligent** : L'application vous permet de prendre des notes pendant vos conversations. Ces notes deviennent comme une "mémoire" que l'assistant peut consulter, permettant des échanges de plus en plus profonds au fil du temps.
+
+3. **Organisation intuitive** : Vos conversations sont naturellement organisées, un peu comme dans une messagerie moderne, mais avec la possibilité de les regrouper par thèmes.
+
+Concrètement, vous pourriez utiliser Dialogue pour :
+- Explorer des sujets complexes en profondeur
+- Garder une trace structurée de vos réflexions
+- Développer des idées sur la durée
+- Avoir un véritable compagnon de réflexion disponible 24/7
+
+C'est comme avoir un assistant personnel brillant, patient et organisé, qui s'adapte à votre façon de penser et vous aide à approfondir vos réflexions, le tout dans une interface aussi simple à utiliser qu'une application de messagerie moderne.
 
 ## 🚀 Installation
 
