@@ -127,7 +127,7 @@ body {
     padding: 2rem;
     display: flex;
     flex-direction: column;
-    min-height: calc(100vh - 200px);
+    min-height: calc(100vh - 220px);
     gap: 1rem;
     min-height: 0;
 }
@@ -138,6 +138,7 @@ body {
     padding: 1rem;
     position: relative;
     bottom: 0;
+    margin-bottom: 20px;
 }
 
 .chat-input {

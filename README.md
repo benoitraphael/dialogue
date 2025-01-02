@@ -33,17 +33,20 @@ cd mini-claude
 pip install -r requirements.txt
 ```
 
-3. Configurez votre clé API Anthropic :
+3. Lancez l'application :
 ```bash
-export ANTHROPIC_API_KEY='votre-clé-api'
+flask run --port 5001
 ```
 
-4. Lancez l'application :
-```bash
-python app.py --port 5001
-```
+4. Ouvrez votre navigateur à l'adresse : `http://localhost:5001`
 
-5. Ouvrez votre navigateur à l'adresse : `http://localhost:5001`
+5. Configurez votre clé API Anthropic :
+   - Cliquez sur le bouton "Configuration API" dans l'interface
+   - Entrez votre clé API Anthropic (commence par "sk-ant-api03-...")
+   - Testez la validité de la clé
+   - Sauvegardez la configuration
+
+La clé API est stockée de manière sécurisée et chiffrée localement sur votre machine.
 
 ## Technologies Utilisées
 
